@@ -30,7 +30,14 @@
  * @returns {Array.<Array.<Number>>} Left and right channel sample data.
  */
 
-zzfxM = (instruments, patterns, sequence, BPM = 125) => {
+// Optional engine supports modern ZzFX; omission preserves the legacy global API.
+var zzfxM = (instruments, patterns, sequence, BPM = 125, engine) => {
+  const sampleRate = engine ? engine.sampleRate : globalThis.zzfxR;
+  const generator = engine ? engine.buildSamples : globalThis.zzfxG;
+  if (!Number.isFinite(sampleRate) || sampleRate <= 0 || typeof generator !== 'function') {
+    throw new TypeError('ZzFXM: pass a ZzFX engine or provide zzfxR and zzfxG globals; ES-module users can import html/kit/zzfxm.js');
+  }
+  const buildSamples = engine ? generator.bind(engine) : generator;
   let instrumentParameters;
   let i;
   let j;
@@ -54,7 +61,7 @@ zzfxM = (instruments, patterns, sequence, BPM = 125) => {
   let panning = 0;
   let hasMore = 1;
   let sampleCache = {};
-  let beatLength = zzfxR / BPM * 60 >> 2;
+  let beatLength = sampleRate / BPM * 60 >> 2;
 
   // for each channel in order until there are no more
   for(; hasMore; channelIndex++) {
@@ -113,7 +120,7 @@ zzfxM = (instruments, patterns, sequence, BPM = 125) => {
                 instrumentParameters[2] *= 2 ** ((note - 12) / 12),
 
                 // allow negative values to stop notes
-                note > 0 ? zzfxG(...instrumentParameters) : []
+                note > 0 ? buildSamples(...instrumentParameters) : []
             );
           }
         }
@@ -126,3 +133,6 @@ zzfxM = (instruments, patterns, sequence, BPM = 125) => {
 
   return [leftChannelBuffer, rightChannelBuffer];
 }
+
+// Also available when this classic renderer is loaded as an ES-module dependency.
+globalThis.zzfxM = zzfxM;

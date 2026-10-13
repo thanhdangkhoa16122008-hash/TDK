@@ -3,7 +3,18 @@
 // Dùng: const input = createInput({ buttons: ['jump', 'action'] });
 //   mỗi frame đọc input.move.x / input.move.y (-1..1), input.pressed('jump') (true 1 lần mỗi lần bấm)
 export function createInput({ buttons = ['jump'], labels = {} } = {}) {
-  const state = { move: { x: 0, y: 0 }, held: new Set(), queue: new Set() };
+  const state = { move: { x: 0, y: 0 }, queue: new Set() };
+  const keys = new Set();
+  const pointers = new Map();
+  const keyMap = { Space: 'jump', KeyE: 'action', KeyF: 'action', ShiftLeft: 'run' };
+  const reset = () => {
+    keys.clear();
+    pointers.forEach((ids) => ids.clear());
+    state.queue.clear();
+    state.move.x = state.move.y = 0;
+  };
+  addEventListener('blur', reset);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) reset(); });
 
   // Joystick nửa trái màn hình
   const zone = document.createElement('div');
@@ -11,7 +22,7 @@ export function createInput({ buttons = ['jump'], labels = {} } = {}) {
   document.body.appendChild(zone);
   if (window.nipplejs) {
     const joy = window.nipplejs.create({ zone, mode: 'dynamic', color: 'white', size: 110 });
-    joy.on('move', (_, d) => {
+    joy.on('move', (event, d = event.data) => {
       if (!d || !d.vector) return;
       const f = Math.min(d.force ?? 1, 1);
       state.move.x = d.vector.x * f;
@@ -31,27 +42,27 @@ export function createInput({ buttons = ['jump'], labels = {} } = {}) {
       width: '72px', height: '72px', borderRadius: '50%', border: '2px solid rgba(255,255,255,.7)',
       background: 'rgba(0,0,0,.35)', color: '#fff', font: 'bold 13px system-ui', touchAction: 'none', userSelect: 'none',
     });
-    const down = (e) => { e.preventDefault(); state.held.add(name); state.queue.add(name); };
-    const up = (e) => { e.preventDefault(); state.held.delete(name); };
+    if (!pointers.has(name)) pointers.set(name, new Set());
+    const ids = pointers.get(name);
+    const down = (e) => { e.preventDefault(); ids.add(e.pointerId); state.queue.add(name); };
+    const up = (e) => { e.preventDefault(); ids.delete(e.pointerId); };
     b.addEventListener('pointerdown', down);
     b.addEventListener('pointerup', up);
     b.addEventListener('pointerleave', up);
+    b.addEventListener('pointercancel', up);
+    b.addEventListener('lostpointercapture', up);
     bar.appendChild(b);
   }
 
   // Bàn phím (PC)
-  const keys = new Set();
-  const keyMap = { Space: 'jump', KeyE: 'action', KeyF: 'action', ShiftLeft: 'run' };
   addEventListener('keydown', (e) => {
     if (keys.has(e.code)) return;
     keys.add(e.code);
     const n = keyMap[e.code];
-    if (n) { state.held.add(n); state.queue.add(n); }
+    if (n) state.queue.add(n);
   });
   addEventListener('keyup', (e) => {
     keys.delete(e.code);
-    const n = keyMap[e.code];
-    if (n) state.held.delete(n);
   });
 
   return {
@@ -61,7 +72,7 @@ export function createInput({ buttons = ['jump'], labels = {} } = {}) {
       if (kx || ky) { const l = Math.hypot(kx, ky); return { x: kx / l, y: ky / l }; }
       return state.move;
     },
-    held: (n) => state.held.has(n),
+    held: (n) => !!pointers.get(n)?.size || [...keys].some((code) => keyMap[code] === n),
     pressed: (n) => { const v = state.queue.has(n); state.queue.delete(n); return v; },
     keyMap,
   };
