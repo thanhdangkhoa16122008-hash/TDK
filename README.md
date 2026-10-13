@@ -37,6 +37,8 @@ html/
     horror-fps-starter/    kinh dị góc nhìn thứ nhất: biệt thự, đèn pin hết pin, cửa, chìa khóa, bóng ma, nỗi sợ
     basic-3d-starter/      bản tối giản, không dùng file model
     character-viewer/      xem nhân vật anime xoay 360°, đổi tóc/màu/biểu cảm/động tác
+  games/               Game hoàn chỉnh
+    can-nha-cuoi-hem/      kinh dị khám phá + giải đố (màn ngang): 9 phòng, 6 câu đố, bóng đen săn đuổi, trốn tủ, lưu game
   tools/
     build-single.mjs     đóng gói game thành MỘT file .html offline (nhúng cả model/âm thanh)
     test-game.mjs        chạy thử như điện thoại: bắt lỗi, đo FPS, giả lập điều khiển, chụp màn hình
