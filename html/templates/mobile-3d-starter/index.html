@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Mobile 3D Starter</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #87ceeb; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; }
+  #hud { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); color: #fff; font: 700 18px system-ui; text-shadow: 0 2px 4px #0008; z-index: 20; pointer-events: none; }
+  #start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #0009; color: #fff; font: 600 16px system-ui; z-index: 50; }
+  #start h1 { margin: 0; font-size: 28px; }
+  #start button { padding: 14px 32px; font: 700 18px system-ui; border: 0; border-radius: 12px; background: #ffc107; color: #222; }
+</style>
+<!-- Thư viện dùng chung trong repo. Khi đóng gói 1 file, chạy: node html/tools/build-single.mjs <thư mục game> -->
+<script type="importmap">
+{ "imports": {
+  "three": "../../libs/three/three.module.min.js",
+  "three/addons/": "../../libs/three/addons/",
+  "cannon-es": "../../libs/physics/cannon-es.min.js"
+} }
+</script>
+<script src="../../libs/input/nipplejs.min.js"></script>
+</head>
+<body>
+<div id="hud">🪙 0 / 0</div>
+<div id="start"><h1>Mobile 3D Starter</h1><div>Joystick: nửa trái · Nút: phải · PC: WASD + Space</div><button id="play">CHƠI</button></div>
+<script type="module">
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+import * as LP from '../../kit/lowpoly.js';
+import { SFX, Music, unlockAudio } from '../../kit/sfx.js';
+import { createInput, requireLandscape } from '../../kit/input.js';
+
+requireLandscape();
+
+// ---------- Cảnh ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); // giới hạn để điện thoại không nóng
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 25, 60);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x557744, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+sun.position.set(10, 20, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20 });
+scene.add(sun, sun.target);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), LP.mat(0x7cb342));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ---------- Vật lý ----------
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -20, 0) });
+const groundBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
+groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+world.addBody(groundBody);
+const addCollider = (obj, radius, height = 2) => {
+  const b = new CANNON.Body({ mass: 0, shape: new CANNON.Cylinder(radius, radius, height, 8) });
+  b.position.set(obj.position.x, height / 2, obj.position.z);
+  world.addBody(b);
+};
+
+// ---------- Thế giới ----------
+LP.scatter(scene, (i) => (i % 3 ? LP.tree({ seed: i }) : LP.roundTree({ seed: i, size: 1.2 })), { count: 30, area: 70, avoid: 6, seed: 11 })
+  .forEach((t) => addCollider(t, 0.4));
+LP.scatter(scene, (i) => LP.rock({ seed: i, size: 0.4 + (i % 3) * 0.2 }), { count: 15, area: 60, avoid: 5, seed: 23 })
+  .forEach((r) => addCollider(r, 0.5, 1));
+LP.scatter(scene, (i) => LP.bush({ seed: i }), { count: 20, area: 60, avoid: 4, seed: 37 });
+
+const house = LP.house();
+house.position.set(-8, 0, -10);
+scene.add(house);
+const hb = new CANNON.Body({ mass: 0, shape: new CANNON.Box(new CANNON.Vec3(1.5, 1, 1.5)) });
+hb.position.set(-8, 1, -10);
+world.addBody(hb);
+
+for (let i = 0; i < 4; i++) {
+  const f = LP.fence({ length: 4 });
+  f.position.set(4 + i * 4, 0, -6);
+  scene.add(f);
+}
+for (let i = 0; i < 4; i++) {
+  const c = LP.crop({ stage: i });
+  c.position.set(5 + i * 1.2, 0, -4);
+  scene.add(c);
+}
+
+const coins = [];
+LP.scatter(scene, () => LP.coin(), { count: 12, area: 40, avoid: 3, seed: 51 }).forEach((c) => coins.push(c));
+const hud = document.getElementById('hud');
+let score = 0;
+const updateHud = () => (hud.textContent = `🪙 ${score} / ${coins.length + score}`);
+updateHud();
+
+// ---------- Người chơi ----------
+const player = LP.character();
+scene.add(player);
+const R = 0.4;
+const pBody = new CANNON.Body({ mass: 1, shape: new CANNON.Sphere(R), linearDamping: 0.1, fixedRotation: true });
+pBody.position.set(0, 2, 0);
+world.addBody(pBody);
+let grounded = false;
+pBody.addEventListener('collide', (e) => {
+  const n = e.contact.ni;
+  const up = e.contact.bi === pBody ? -n.y : n.y;
+  if (up > 0.5) grounded = true;
+});
+
+const input = createInput({ buttons: ['jump'], labels: { jump: 'NHẢY' } });
+const SPEED = 6;
+let camYaw = 0;
+let stepTimer = 0;
+
+// ---------- Vòng lặp ----------
+const clock = new THREE.Clock();
+const camTarget = new THREE.Vector3();
+function loop() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const mv = input.move;
+  const mag = Math.min(Math.hypot(mv.x, mv.y), 1);
+
+  // hướng đi theo camera
+  const fwd = new THREE.Vector3(-Math.sin(camYaw), 0, -Math.cos(camYaw));
+  const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const dir = fwd.multiplyScalar(mv.y).add(right.multiplyScalar(mv.x));
+  pBody.velocity.x = dir.x * SPEED;
+  pBody.velocity.z = dir.z * SPEED;
+  if (mag > 0.1) {
+    const targetRot = Math.atan2(dir.x, dir.z);
+    let d = targetRot - player.rotation.y;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    player.rotation.y += d * Math.min(1, dt * 12);
+  }
+  if (input.pressed('jump') && grounded) {
+    pBody.velocity.y = 8;
+    grounded = false;
+    SFX.play('jump');
+  }
+  world.step(1 / 60, dt, 3);
+  if (pBody.position.y < -10) pBody.position.set(0, 3, 0);
+
+  player.position.set(pBody.position.x, pBody.position.y - R, pBody.position.z);
+  player.userData.animate(dt, grounded ? mag : 0);
+  if (grounded && mag > 0.2 && (stepTimer -= dt) <= 0) { SFX.playVaried('step'); stepTimer = 0.32; }
+
+  // nhặt xu
+  for (let i = coins.length - 1; i >= 0; i--) {
+    const c = coins[i];
+    c.rotation.y += dt * 3;
+    if (c.position.distanceTo(player.position) < 1) {
+      scene.remove(c);
+      coins.splice(i, 1);
+      score++;
+      updateHud();
+      SFX.play('coin');
+    }
+  }
+
+  // camera bám sau lưng
+  camTarget.set(player.position.x + Math.sin(camYaw) * 7, player.position.y + 5, player.position.z + Math.cos(camYaw) * 7);
+  camera.position.lerp(camTarget, Math.min(1, dt * 5));
+  camera.lookAt(player.position.x, player.position.y + 1.2, player.position.z);
+  sun.position.set(player.position.x + 10, 20, player.position.z + 8);
+  sun.target.position.copy(player.position);
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+document.getElementById('play').addEventListener('click', () => {
+  unlockAudio();
+  Music.start('calm');
+  document.getElementById('start').remove();
+  document.documentElement.requestFullscreen?.().catch(() => {});
+  screen.orientation?.lock?.('landscape').catch(() => {});
+});
+loop();
+</script>
+</body>
+</html>
