@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Model Sheet</title>
+<style>
+  body { margin: 0; background: #20232a; color: #ddd; font: 12px system-ui; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, 160px); gap: 6px; padding: 8px; }
+  .cell { background: #2c313a; border-radius: 6px; overflow: hidden; }
+  .cell img { width: 160px; height: 120px; display: block; }
+  .cell div { padding: 3px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell .a { color: #8bc34a; font-size: 10px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "../libs/three/three.module.min.js", "three/addons/": "../libs/three/addons/" } }
+</script>
+</head>
+<body>
+<!-- Xem trước toàn bộ model trong html/assets (mở qua web server ở gốc repo). ?filter=kenney-arena để lọc -->
+<div id="grid"></div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const catalog = await (await fetch('../assets/catalog.json')).json();
+const filter = new URLSearchParams(location.search).get('filter') || '';
+const paths = Object.keys(catalog).filter((p) => p.endsWith('.glb') && p.includes(filter));
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setSize(320, 240);
+r.outputColorSpace = THREE.SRGBColorSpace;
+r.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x3a404c);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 2));
+const dl = new THREE.DirectionalLight(0xffffff, 2); dl.position.set(3, 5, 4); scene.add(dl);
+const cam = new THREE.PerspectiveCamera(35, 4 / 3, 0.01, 1000);
+const loader = new GLTFLoader();
+const grid = document.getElementById('grid');
+for (const p of paths) {
+  const g = await loader.loadAsync('../assets/' + p);
+  const o = g.scene;
+  scene.add(o);
+  const box = new THREE.Box3().setFromObject(o), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+  const d = Math.max(size.x, size.y, size.z) * 1.9;
+  cam.position.set(c.x + d * 0.7, c.y + d * 0.55, c.z + d * 0.9);
+  cam.lookAt(c);
+  r.render(scene, cam);
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  const anims = catalog[p].animations || [];
+  cell.innerHTML = `<img src="${r.domElement.toDataURL()}"><div title="${p}">${p.replace('models/', '')}</div><div class="a">${anims.length ? anims.length + ' anim: ' + anims.slice(0, 6).join(', ') : `${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)}`}</div>`;
+  grid.appendChild(cell);
+  scene.remove(o);
+}
+document.title = 'done';
+</script>
+</body>
+</html>

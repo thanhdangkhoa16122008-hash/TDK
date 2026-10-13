@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Horror FPS Starter</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; }
+  #start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: radial-gradient(#1a0d0d, #000); color: #ddd; font: 600 15px system-ui; z-index: 50; text-align: center; padding: 20px; }
+  #start h1 { margin: 0; font: 800 34px Georgia, serif; color: #b71c1c; letter-spacing: 3px; text-shadow: 0 0 18px #f005; }
+  #start button { padding: 14px 36px; font: 700 18px system-ui; border: 1px solid #b71c1c; border-radius: 10px; background: #2a0a0a; color: #fff; }
+  #end { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; background: #000d; color: #fff; font: 700 26px Georgia, serif; z-index: 70; }
+  #cross { position: fixed; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: #fff8; z-index: 20; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "../../libs/three/three.module.min.js",
+  "three/addons/": "../../libs/three/addons/",
+  "cannon-es": "../../libs/physics/cannon-es.min.js"
+} }
+</script>
+<script src="../../libs/input/nipplejs.min.js"></script>
+</head>
+<body>
+<div id="start"><h1>BIỆT THỰ</h1><div>Tìm chìa khóa và thoát ra.<br>Joystick: nửa trái · Vuốt nửa phải: nhìn · 🔦 bật/tắt đèn · ✋ mở cửa<br>PC: WASD, chuột, E mở cửa, F đèn pin</div><button id="play">BƯỚC VÀO</button></div>
+<div id="end"><div id="endText"></div><button onclick="location.reload()" style="font:700 16px system-ui;padding:10px 24px">Chơi lại</button></div>
+<div id="cross"></div>
+<script type="module">
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+import { createWorld } from '../../kit/world.js';
+import { createPostFX } from '../../kit/postfx.js';
+import { buildGridLevel } from '../../kit/level.js';
+import { PlayerController } from '../../kit/controls.js';
+import { createInput, requireLandscape } from '../../kit/input.js';
+import { SFX, Music, unlockAudio } from '../../kit/sfx.js';
+import { Tex } from '../../kit/textures.js';
+import { UI } from '../../kit/ui.js';
+import { weather, Shake } from '../../kit/fx.js';
+
+requireLandscape();
+
+// ---------- Bản đồ: # tường, . sàn, D cửa, W cửa sổ, P người chơi, K chìa khóa, E lối ra, G bóng ma, L đèn trần ----------
+const MAP = `
+#######W#######
+#P..L..#...L..#
+#......D......#
+#......#......#
+###D####..G...#
+#.....##......#
+#..L..##W##D###
+#.....D.......#
+#K....##..L..E#
+###############`;
+
+const W = createWorld({ background: 0x000000, fog: [3, 20], quality: 'auto' });
+W.scene.fog.color.set(0x050507);
+W.hemi.intensity = 0.12;
+W.hemi.color.set(0x8899ff);
+W.sun.intensity = 0;
+W.sun.castShadow = false;
+
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -20, 0) });
+const L = buildGridLevel(W.scene, world, CANNON, MAP, {
+  cell: 3, wallHeight: 3.2,
+  materials: {
+    wall: new THREE.MeshStandardMaterial({ map: Tex.wallpaper(), roughness: 0.95 }),
+    floor: new THREE.MeshStandardMaterial({ map: Tex.wood({ planks: 6 }), roughness: 0.8 }),
+    ceiling: new THREE.MeshStandardMaterial({ map: Tex.concrete(), roughness: 1, color: 0x666666 }),
+  },
+});
+
+// Đèn trần chập chờn. Điện thoại tính ánh sáng theo từng đèn, nên chỉ dùng 3 PointLight thật
+// và gán cho 3 bóng đèn gần người chơi nhất; bóng ở xa chỉ là khối phát sáng (rất nhẹ).
+const lamps = (L.markers.L || []).map((p) => {
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd9a0 }));
+  bulb.position.set(p.x, 2.9, p.z);
+  W.scene.add(bulb);
+  return { pos: bulb.position, bulb, t: Math.random() * 10, on: true };
+});
+const lightPool = [0, 1, 2].map(() => { const l = new THREE.PointLight(0xffb070, 0, 10, 1.5); W.scene.add(l); return l; });
+const LAMP_POWER = 28;
+// Vết máu trang trí
+const stainMat = new THREE.MeshBasicMaterial({ map: Tex.stains(), transparent: true, depthWrite: false, opacity: 0.85 });
+for (const p of [...(L.markers.G || []), ...(L.markers.K || [])]) {
+  const s = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), stainMat);
+  s.rotation.x = -Math.PI / 2; s.position.set(p.x + 0.5, 0.01, p.z - 0.3);
+  W.scene.add(s);
+}
+
+// Chìa khóa
+const keyPos = L.markers.K[0];
+const key = new THREE.Group();
+const gold = new THREE.MeshStandardMaterial({ color: 0xffc94a, metalness: 0.9, roughness: 0.25, emissive: 0x553300, emissiveIntensity: 0.6 });
+const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 8, 16), gold);
+const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.3, 0.04), gold);
+shaft.position.y = -0.24;
+key.add(ring, shaft);
+key.position.set(keyPos.x, 0.9, keyPos.z);
+W.scene.add(key);
+let hasKey = false;
+
+// Lối ra
+const exitPos = L.markers.E[0];
+const exitDoor = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.4, 0.15), new THREE.MeshStandardMaterial({ color: 0x2b1a10, emissive: 0x220000 }));
+exitDoor.position.set(exitPos.x + 1.4, 1.2, exitPos.z);
+exitDoor.rotation.y = Math.PI / 2;
+W.scene.add(exitDoor);
+const exitSign = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.25, 0.7), new THREE.MeshBasicMaterial({ color: 0xff2020 }));
+exitSign.position.set(exitPos.x + 1.4, 2.7, exitPos.z);
+W.scene.add(exitSign);
+
+// Bóng ma: hình người tối, chỉ xuất hiện khi người chơi đến gần rồi biến mất
+const ghostPos = L.markers.G[0];
+const ghost = new THREE.Group();
+const gMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.92 });
+const gBody = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, 1.6, 8), gMat);
+gBody.position.y = 0.8;
+const gHead = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), gMat);
+gHead.position.y = 1.8;
+const eyeM = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 4), eyeM); e1.position.set(-0.07, 1.83, 0.18);
+const e2 = e1.clone(); e2.position.x = 0.07;
+ghost.add(gBody, gHead, e1, e2);
+ghost.position.set(ghostPos.x, 0, ghostPos.z);
+ghost.visible = false;
+W.scene.add(ghost);
+let ghostState = 'waiting'; // waiting → shown → gone
+let ghostTimer = 0;
+
+// Một cửa bị khóa cho tới khi có chìa (cửa gần lối ra nhất)
+const lockedDoor = L.doors.reduce((a, d) => (d.position.distanceTo(exitPos) < a.position.distanceTo(exitPos) ? d : a));
+lockedDoor.locked = true;
+
+// ---------- Người chơi ----------
+const input = createInput({ buttons: ['light', 'action'], labels: { light: '🔦', action: '✋' } });
+input.keyMap.KeyF = 'light';
+const start = L.markers.P[0];
+const pc = new PlayerController({ world, CANNON, input, camera: W.camera, mode: 'first', start: new THREE.Vector3(start.x, 0.2, start.z), walk: 2.8, run: 4.5, jump: 0, sensitivity: 0.006 });
+pc.yaw = -Math.PI / 2;
+W.scene.add(W.camera);
+
+// Đèn pin gắn vào camera
+const flash = new THREE.SpotLight(0xfff1d6, 120, 20, 0.5, 0.5, 1.2);
+flash.position.set(0.25, -0.2, 0);
+flash.target.position.set(0, -0.3, -3);
+flash.castShadow = !W.mobile;
+flash.shadow.mapSize.set(512, 512);
+W.camera.add(flash, flash.target);
+let battery = 1, lightOn = true;
+const batteryBar = UI.bar('bat', { label: '🔋', color: '#ffd54f' });
+const fearBar = UI.bar('fear', { label: '💀', color: '#e53935', value: 0 });
+let fear = 0;
+
+const fx = createPostFX(W, 'horror');
+const dust = weather(W.scene, 'dust');
+const shake = new Shake(W.camera);
+let stepT = 0, heartT = 0, ended = false;
+
+function end(text, color) {
+  ended = true;
+  pc.enabled = false;
+  Music.stop();
+  const e = document.getElementById('end');
+  e.style.display = 'flex';
+  const t = document.getElementById('endText');
+  t.textContent = text;
+  t.style.color = color;
+}
+
+// Cho công cụ test-game đọc trạng thái
+window.__game = { pc, L, get ended() { return ended; }, stats: () => ({ battery: +battery.toFixed(2), fear: +fear.toFixed(2), hasKey, ghostState, fxLevel: fx.level, pos: pc.position.toArray().map((v) => +v.toFixed(1)) }) };
+
+W.start((dt, t) => {
+  pc.update(dt);
+  world.step(1 / 60, dt, 3);
+  L.update(dt);
+
+  // đèn pin: hao pin, chập chờn khi yếu
+  if (input.pressed('light') && battery > 0) { lightOn = !lightOn; SFX.play('click'); }
+  if (lightOn) battery = Math.max(0, battery - dt * 0.006);
+  if (battery <= 0) lightOn = false;
+  const weak = battery < 0.25 ? (Math.random() < 0.08 ? 0.1 : 1) : 1;
+  flash.intensity = lightOn ? 120 * weak * (0.5 + battery * 0.5) : 0;
+  batteryBar.set(battery);
+
+  // đèn trần chập chờn + gán đèn thật cho 3 bóng gần nhất
+  for (const f of lamps) {
+    f.t += dt;
+    f.on = Math.sin(f.t * 13) + Math.sin(f.t * 7.3) > -1.2 || Math.random() < 0.3;
+    f.bulb.material.color.setHex(f.on ? 0xffd9a0 : 0x332211);
+    f.d = f.pos.distanceToSquared(W.camera.position);
+  }
+  const near = [...lamps].sort((a, b) => a.d - b.d);
+  lightPool.forEach((l, i) => {
+    const f = near[i];
+    if (!f) { l.intensity = 0; return; }
+    l.position.copy(f.pos);
+    l.intensity = f.on ? LAMP_POWER * (0.85 + Math.random() * 0.15) : 0.3;
+  });
+
+  // tương tác cửa / chìa khóa
+  const door = L.nearestDoor(pc.position);
+  const nearKey = !hasKey && key.position.distanceTo(new THREE.Vector3(pc.position.x, 0.9, pc.position.z)) < 1.5;
+  const nearExit = Math.hypot(pc.position.x - exitPos.x, pc.position.z - exitPos.z) < 2;
+  UI.prompt(nearKey ? '✋ Nhặt chìa khóa' : nearExit ? (hasKey ? '✋ Mở cửa thoát' : 'Cửa khóa chặt...') : door ? (door.locked && !hasKey ? '🔒 Cửa bị khóa' : '✋ ' + (door.isOpen ? 'Đóng cửa' : 'Mở cửa')) : null);
+  if (input.pressed('action')) {
+    if (nearKey) {
+      hasKey = true; W.scene.remove(key); SFX.play('pickup'); UI.toast('🗝️ Đã có chìa khóa'); lockedDoor.locked = false;
+      UI.dialog('', 'Có tiếng bước chân ở tầng trên...');
+    } else if (nearExit && hasKey) {
+      SFX.play('door'); end('BẠN ĐÃ THOÁT', '#81c784');
+    } else if (door) {
+      if (door.toggle()) SFX.play('door'); else SFX.play('error');
+    }
+  }
+  key.rotation.y += dt * 1.5;
+  key.position.y = 0.9 + Math.sin(t * 2) * 0.05;
+
+  // bóng ma
+  const gd = Math.hypot(pc.position.x - ghost.position.x, pc.position.z - ghost.position.z);
+  if (ghostState === 'waiting' && gd < 7) {
+    ghostState = 'shown'; ghost.visible = true; ghostTimer = 1.4;
+    SFX.play('scream'); shake.add(0.7); fx.flash(0.5); fear = Math.min(1, fear + 0.5);
+  } else if (ghostState === 'shown') {
+    ghostTimer -= dt;
+    ghost.lookAt(pc.position.x, 0, pc.position.z);
+    ghost.position.lerp(new THREE.Vector3(pc.position.x, 0, pc.position.z), dt * 0.4);
+    gMat.opacity = 0.92 * Math.min(1, ghostTimer);
+    if (ghostTimer <= 0) { ghost.visible = false; ghostState = 'gone'; }
+  }
+
+  // nỗi sợ: tăng trong bóng tối, giảm khi có ánh sáng
+  const lit = lightOn || near.some((f) => f.on && f.d < 16);
+  fear = THREE.MathUtils.clamp(fear + (lit ? -0.03 : 0.04) * dt, 0, 1);
+  fearBar.set(fear);
+  fx.set({ vignette: 1.2 + fear * 1.2, chroma: 0.4 + fear * 1.5, saturation: 0.5 - fear * 0.3 });
+  if (fear >= 1 && !ended) end('BẠN ĐÃ PHÁT ĐIÊN', '#e53935');
+
+  // âm thanh: bước chân và nhịp tim theo nỗi sợ
+  if (pc.speed01 > 0.1 && (stepT -= dt) <= 0) { SFX.playVaried('step'); stepT = 0.5; }
+  if (fear > 0.3 && (heartT -= dt) <= 0) { SFX.play('heartbeat', { volume: fear }); heartT = 1.1 - fear * 0.6; }
+
+  dust.update(dt, pc.position);
+  shake.update(dt);
+  fx.render(dt);
+});
+
+document.getElementById('play').addEventListener('click', () => {
+  unlockAudio();
+  Music.start('horror');
+  document.getElementById('start').remove();
+  document.documentElement.requestFullscreen?.().catch(() => {});
+  screen.orientation?.lock?.('landscape').catch(() => {});
+  UI.dialog('', 'Cánh cửa đóng sập sau lưng. Mình phải tìm cách ra khỏi đây.');
+});
+</script>
+</body>
+</html>

@@ -1,65 +1,71 @@
 # TDK — Bộ công cụ làm game của Khoa-TDK
 
-Kho chứa thư viện, công cụ và khung game mẫu dùng chung cho các dự án game HTML (điện thoại/PC) và Godot. Tất cả đều miễn phí, mã nguồn mở, dùng thương mại được.
+Thư viện, tài nguyên, bộ kit và khung game mẫu cho game HTML (điện thoại màn ngang/PC) và Godot.
+Tất cả miễn phí, mã nguồn mở / CC0, dùng thương mại được. Quy trình làm game: xem [GAMEDEV.md](GAMEDEV.md).
 
 ## Cấu trúc
 
 ```
 html/
-  libs/        Thư viện đã đóng gói sẵn, chạy offline
-    three/       Three.js r186 (3D) + addons: GLTFLoader, OrbitControls, BufferGeometryUtils, SkeletonUtils
-                 three-all.module.min.js = Three.js + toàn bộ addons trong 1 file
-    physics/     cannon-es 0.20 (vật lý: va chạm, trọng lực, nhảy)
-    input/       nipplejs 1.0.4 (joystick cảm ứng)
-    audio/       howler.js (phát nhạc/hiệu ứng file mp3/ogg), ZzFX + ZzFXM (âm thanh tạo bằng code), jsfxr
-  kit/         Code tự viết, tái sử dụng cho mọi game
-    lowpoly.js   Model 3D low-poly dựng bằng code: cây, đá, bụi, nhà, hàng rào, cây trồng 4 giai đoạn, xu, nhân vật biết đi
-    sfx.js       12 hiệu ứng âm thanh có sẵn (coin, jump, step, hit, plant, harvest, door, scream, heartbeat…)
-                 + nhạc nền tự sinh 3 tâm trạng: calm / happy / horror
-    input.js     Joystick + nút cho điện thoại, WASD/Space cho PC, màn hình bắt xoay ngang
-  templates/
-    mobile-3d-starter/  Game mẫu chạy được: nhân vật đi lại, nhảy, nhặt xu, cảnh nông trại, âm thanh
+  libs/                Thư viện, chạy offline
+    three/               Three.js r186 + addons (GLTFLoader, hậu kỳ, Sky, SimplexNoise, PointerLock, stats…)
+    physics/             cannon-es 0.20 (va chạm, trọng lực, địa hình)
+    input/               nipplejs 1.0.4 (joystick cảm ứng)
+    audio/               howler.js (mp3), ZzFX/ZzFXM + jsfxr (âm thanh tạo bằng code)
+    anim/                tween.js 25 (chuyển động mượt cho UI/vật thể)
+  assets/              Tài nguyên CC0 — xem catalog.png (ảnh xem trước) và catalog.json (danh sách + animation)
+    models/              76 model .glb: Kenney (arena, city, fps, platformer, racing) + robot Quaternius
+                         nhân vật có animation: kenney-arena/character-soldier (32 động tác), quaternius/robot (14), kenney-platformer/character (4)
+    sounds/              32 âm thanh .mp3 của Kenney (nhảy, xu, bước chân, súng, xe, xây dựng, nhạc nền thành phố)
+  kit/                 Code dùng lại cho mọi game
+    world.js             renderer chuẩn mobile, vòng lặp, chu kỳ ngày/đêm + bầu trời
+    controls.js          điều khiển nhân vật góc nhìn thứ 1 và thứ 3, vuốt xoay camera, camera không xuyên tường
+    input.js             joystick + nút cảm ứng, bàn phím PC, bắt xoay ngang
+    assets.js            nạp model/âm thanh, điều khiển animation (chuyển mượt), đặt model lên mặt đất
+    terrain.js           địa hình đồi núi tự sinh có nước + collider + rải cây/đá theo địa hình
+    level.js             dựng nhà/biệt thự từ bản đồ chữ (# tường, D cửa mở được, W cửa sổ, đánh dấu vị trí)
+    postfx.js            hậu kỳ: bright / horror / retro, tự hạ chất lượng khi máy yếu
+    ui.js                thông báo, hội thoại chữ chạy có lựa chọn, thanh đồ, menu, loading, thanh máu, chữ bay
+    save.js              lưu game (có phiên bản, tự lưu, xuất/nhập mã sao lưu)
+    textures.js          texture tự vẽ: cỏ, đất, gỗ, gạch, gạch men, giấy dán tường cũ, bê tông, vết máu
+    fx.js                hạt hiệu ứng, mưa/tuyết/đom đóm/bụi, rung camera
+    lowpoly.js           model low-poly bằng code: cây, đá, nhà, hàng rào, cây trồng 4 giai đoạn, nhân vật
+    sfx.js               12 hiệu ứng âm thanh + nhạc nền tự sinh (calm / happy / horror)
+  templates/           Game mẫu chạy được — copy ra để làm game mới
+    adventure-3d-starter/  góc nhìn thứ 3: nhân vật Kenney có animation, địa hình, ngày/đêm, xu, lưu game
+    horror-fps-starter/    kinh dị góc nhìn thứ nhất: biệt thự, đèn pin hết pin, cửa, chìa khóa, bóng ma, nỗi sợ
+    basic-3d-starter/      bản tối giản, không dùng file model
   tools/
-    build-single.mjs    Đóng gói 1 game thành MỘT file .html chạy offline (gửi điện thoại, đăng artifact)
-godot/
-  addons/      Copy thư mục cần dùng vào res://addons/ của dự án, rồi bật trong Project Settings → Plugins
-    phantom_camera/    Camera bám, chuyển cảnh mượt (Godot 4.4+)
-    dialogic/          Hội thoại, cốt truyện, lựa chọn (2.0-alpha-20, cần Godot 4.5+)
-    beehave/           Behavior tree cho AI quái/NPC (2.9.3)
-    virtual_joystick/  Joystick cảm ứng cho Android (Godot 4.2+)
-    godot_sfxr/        Tạo hiệu ứng âm thanh ngay trong editor
+    build-single.mjs     đóng gói game thành MỘT file .html offline (nhúng cả model/âm thanh)
+    test-game.mjs        chạy thử như điện thoại: bắt lỗi, đo FPS, giả lập điều khiển, chụp màn hình
+    embed-glb.mjs        nhúng texture rời vào file .glb
+    model-sheet.html     xem trước mọi model
+godot/addons/          Copy vào res://addons/ rồi bật trong Project Settings → Plugins
+    phantom_camera/ (4.4+)  dialogic/ (2.0-alpha-20, cần 4.5+)  beehave/ (AI)  virtual_joystick/  godot_sfxr/
 ```
 
-## Cách dùng nhanh
+## Dùng nhanh
 
-**Game HTML mới:** copy `html/templates/mobile-3d-starter` thành thư mục mới, sửa `index.html`.
-Chạy thử cần web server (vì dùng ES module), ví dụ: `npx serve .` ở thư mục gốc repo.
-
-**Đóng gói 1 file:**
+```bash
+npx serve .                                                   # chạy thử: mở /html/templates/<game>/
+node html/tools/test-game.mjs html/templates/horror-fps-starter   # kiểm tra tự động
+node html/tools/build-single.mjs html/templates/adventure-3d-starter  # ra 1 file trong dist/
 ```
-node html/tools/build-single.mjs html/templates/mobile-3d-starter
-```
-Kết quả ở `dist/` trong thư mục game (~690 KB, chạy offline, mở thẳng trên điện thoại).
-
-**Model 3D từ file:** dùng `GLTFLoader` nạp `.glb`. Nguồn model CC0 (dùng tự do): kenney.nl, quaternius.com, poly.pizza.
-
-**Âm thanh mới:** chỉnh tiếng ở https://killedbyapixel.github.io/ZzFX/ rồi copy mảng tham số vào `PRESETS` trong `html/kit/sfx.js`.
+Tham số URL khi thử: `?fx=none` tắt hậu kỳ, `?q=low|medium|high` chất lượng, `?hour=21` giờ trong game.
 
 ## Nguồn & giấy phép
 
-| Thư viện | Nguồn | Giấy phép |
+| Thành phần | Nguồn | Giấy phép |
 |---|---|---|
 | Three.js r186 | github.com/mrdoob/three.js | MIT |
 | cannon-es 0.20.0 | github.com/pmndrs/cannon-es | MIT |
 | nipplejs 1.0.4 | github.com/yoannmoinet/nipplejs (build từ source) | MIT |
 | howler.js | github.com/goldfire/howler.js | MIT |
-| ZzFX 1.4.0 | github.com/KilledByAPixel/ZzFX | MIT |
-| ZzFXM | github.com/keithclark/ZzFXM | MIT |
-| jsfxr 1.4.0 | github.com/chr15m/jsfxr | Unlicense (public domain) |
-| Phantom Camera 0.11.0.3 | github.com/ramokz/phantom-camera | MIT |
-| Dialogic 2.0-alpha-20 | github.com/dialogic-godot/dialogic | MIT |
-| Beehave 2.9.3 | github.com/bitbrain/beehave | MIT |
-| Virtual Joystick | github.com/MarcoFazioRandom/Virtual-Joystick-Godot | MIT |
-| GodotSfxr | github.com/tomeyro/godot-sfxr | MIT |
+| tween.js 25 | github.com/tweenjs/tween.js | MIT |
+| ZzFX 1.4.0 / ZzFXM | github.com/KilledByAPixel/ZzFX, github.com/keithclark/ZzFXM | MIT |
+| jsfxr 1.4.0 | github.com/chr15m/jsfxr | Unlicense |
+| Model + âm thanh Kenney | github.com/KenneyNL/Starter-Kit-* | CC0 |
+| Robot (Quaternius) | three.js examples | CC0 |
+| Phantom Camera, Dialogic, Beehave, Virtual Joystick, GodotSfxr | xem từng thư mục | MIT |
 
-File LICENSE gốc nằm cạnh từng thư viện. `html/kit/` và `html/templates/` là code của TDK.
+Chi tiết tài nguyên: `html/assets/LICENSE.md`. `html/kit/`, `html/templates/`, `html/tools/` là code của TDK.

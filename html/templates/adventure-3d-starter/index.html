@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Adventure 3D Starter</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #87ceeb; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; }
+  #hud { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); color: #fff; font: 800 18px system-ui; text-shadow: 0 2px 4px #0009; z-index: 20; pointer-events: none; text-align: center; }
+  #hud small { display: block; font-size: 12px; font-weight: 600; opacity: .85; }
+  #start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: linear-gradient(#4fa3e0cc, #2e7d32cc); color: #fff; font: 600 15px system-ui; z-index: 50; text-align: center; }
+  #start h1 { margin: 0; font-size: 32px; text-shadow: 0 3px 8px #0006; }
+  #start button { padding: 14px 36px; font: 800 18px system-ui; border: 0; border-radius: 14px; background: #ffc107; color: #222; box-shadow: 0 4px 0 #c79100; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "../../libs/three/three.module.min.js",
+  "three/addons/": "../../libs/three/addons/",
+  "cannon-es": "../../libs/physics/cannon-es.min.js"
+} }
+</script>
+<script src="../../libs/input/nipplejs.min.js"></script>
+<script src="../../libs/audio/howler.min.js"></script>
+</head>
+<body>
+<div id="hud">🪙 0<small>Ngày 1 · 09:00</small></div>
+<div id="start"><h1>Adventure 3D</h1><div>Joystick: nửa trái · Vuốt nửa phải: xoay camera · PC: WASD + chuột + Space</div><button id="play">CHƠI</button></div>
+<script type="module">
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+import { createWorld, DayNight } from '../../kit/world.js';
+import { createPostFX } from '../../kit/postfx.js';
+import { createTerrain } from '../../kit/terrain.js';
+import { Assets, sizeOf } from '../../kit/assets.js';
+import { PlayerController } from '../../kit/controls.js';
+import { createInput, requireLandscape } from '../../kit/input.js';
+import { Music, unlockAudio } from '../../kit/sfx.js';
+import { UI } from '../../kit/ui.js';
+import { Particles, weather } from '../../kit/fx.js';
+import { createSave } from '../../kit/save.js';
+import * as LP from '../../kit/lowpoly.js';
+
+requireLandscape();
+const save = createSave('adventure-3d-starter', { version: 1, defaults: { coins: 0, day: 1, hour: 9 } });
+save.auto(10);
+
+const W = createWorld({ fog: [40, 110] });
+const sky = new DayNight(W, { dayLength: 240, startHour: save.data.hour });
+const fx = createPostFX(W, 'bright');
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -20, 0) });
+
+// ---------- Địa hình ----------
+const T = createTerrain({ size: 140, height: 7, flat: 14, seed: 4, water: -0.8 });
+W.scene.add(T.mesh);
+T.addPhysics(world, CANNON);
+
+// ---------- Nạp model (Kenney CC0) ----------
+const MODELS = [
+  'models/kenney-arena/character-soldier.glb',
+  'models/kenney-arena/tree.glb',
+  'models/kenney-platformer/coin.glb',
+  'models/kenney-platformer/cloud.glb',
+  'models/kenney-arena/statue.glb',
+  'models/kenney-arena/banner.glb',
+];
+const loading = UI.loading('Đang tải thế giới...');
+await Assets.preload(MODELS, (v) => loading.progress(v));
+loading.done();
+
+// Chuẩn hóa kích thước: đưa model về chiều cao mong muốn
+async function spawn(path, height) {
+  const m = await Assets.model(path);
+  const s = sizeOf(m.object);
+  m.object.scale.multiplyScalar(height / s.y);
+  return m;
+}
+const addTreeCollider = (o, r = 0.5) => {
+  const b = new CANNON.Body({ mass: 0, shape: new CANNON.Cylinder(r, r, 4, 8) });
+  b.position.set(o.position.x, o.position.y + 2, o.position.z);
+  world.addBody(b);
+};
+
+const treeA = await spawn('models/kenney-arena/tree.glb', 4.5);
+T.scatter(W.scene, (i) => {
+  if (i % 3 === 0) return LP.roundTree({ seed: i, size: 1.3 + (i % 4) * 0.15 });
+  const o = treeA.object.clone();
+  o.scale.multiplyScalar(0.8 + ((i * 37) % 10) / 20);
+  return o;
+}, { count: 45, seed: 9 }).forEach((o) => addTreeCollider(o, 0.45));
+T.scatter(W.scene, (i) => LP.rock({ seed: i, size: 0.5 + (i % 3) * 0.3 }), { count: 20, seed: 17 });
+T.scatter(W.scene, (i) => LP.bush({ seed: i }), { count: 35, seed: 27 });
+
+const statue = await spawn('models/kenney-arena/statue.glb', 3);
+statue.object.position.set(0, 0, -8);
+W.scene.add(statue.object);
+const sb = new CANNON.Body({ mass: 0, shape: new CANNON.Box(new CANNON.Vec3(0.8, 1.5, 0.8)) });
+sb.position.set(0, 1.5, -8);
+world.addBody(sb);
+for (const x of [-4, 4]) {
+  const b = await spawn('models/kenney-arena/banner.glb', 3);
+  b.object.position.set(x, 0, -6);
+  W.scene.add(b.object);
+}
+
+const clouds = [];
+for (let i = 0; i < 10; i++) {
+  const c = await spawn('models/kenney-platformer/cloud.glb', 3 + Math.random() * 3);
+  c.object.position.set((Math.random() - 0.5) * 120, 22 + Math.random() * 8, (Math.random() - 0.5) * 120);
+  c.object.traverse((o) => o.isMesh && (o.castShadow = false));
+  W.scene.add(c.object);
+  clouds.push(c.object);
+}
+
+// Xu rải trên địa hình
+const coinProto = await spawn('models/kenney-platformer/coin.glb', 0.8);
+const coins = T.scatter(W.scene, () => coinProto.object.clone(), { count: 25, avoid: 4, seed: 41, area: 90 });
+coins.forEach((c) => (c.userData.baseY = c.position.y + 0.9));
+
+// ---------- Nhân vật ----------
+const hero = await spawn('models/kenney-arena/character-soldier.glb', 1.75);
+W.scene.add(hero.object);
+const input = createInput({ buttons: ['jump'], labels: { jump: 'NHẢY' } });
+const pc = new PlayerController({
+  world, CANNON, input, camera: W.camera, mode: 'third', model: hero.object, anim: hero.anim,
+  start: new THREE.Vector3(0, 3, 4), walk: 4.5, run: 8, jump: 8, camDistance: 7,
+});
+pc.camCollide = [T.mesh];
+
+// ---------- Âm thanh (file mp3 Kenney qua Howler) ----------
+const snd = {
+  coin: Assets.sound('sounds/kenney-platformer/coin.mp3', { volume: 0.6 }),
+  jump: Assets.sound('sounds/kenney-platformer/jump.mp3', { volume: 0.5 }),
+  land: Assets.sound('sounds/kenney-platformer/land.mp3', { volume: 0.5 }),
+  step: Assets.sound('sounds/kenney-platformer/walking.mp3', { volume: 0.25 }),
+};
+pc.onJump = () => snd.jump.play();
+
+const particles = new Particles(W.scene);
+let fireflies = null;
+const hud = document.getElementById('hud');
+const pad = (n) => String(Math.floor(n)).padStart(2, '0');
+let wasGrounded = true, stepT = 0, lastHour = sky.hour;
+
+window.__game = { stats: () => ({ coins: save.data.coins, left: coins.length, hour: +sky.hour.toFixed(1), anim: hero.anim.currentName, fxLevel: fx.level,
+  y: +pc.position.y.toFixed(2), ground: +T.heightAt(pc.position.x, pc.position.z).toFixed(2) }) };
+
+W.start((dt, t) => {
+  pc.update(dt);
+  world.step(1 / 60, dt, 3);
+
+  if (pc.grounded && !wasGrounded) snd.land.play();
+  wasGrounded = pc.grounded;
+  if (pc.grounded && pc.speed01 > 0.15 && (stepT -= dt) <= 0) { snd.step.rate(0.9 + Math.random() * 0.2); snd.step.play(); stepT = 0.45 / (0.5 + pc.speed01); }
+
+  for (let i = coins.length - 1; i >= 0; i--) {
+    const c = coins[i];
+    c.rotation.y += dt * 2.5;
+    c.position.y = c.userData.baseY + Math.sin(t * 2 + i) * 0.15;
+    if (c.position.distanceTo(pc.position) < 1.4 + 0.9) {
+      W.scene.remove(c);
+      coins.splice(i, 1);
+      save.data.coins++;
+      snd.coin.play();
+      particles.burst(c.position, { color: 0xffd54f, count: 18, speed: 2.5 });
+      UI.floatText('+1', c.position, W.camera);
+      if (!coins.length) UI.toast('🎉 Nhặt hết xu rồi!');
+    }
+  }
+
+  // ngày/đêm + đom đóm ban đêm
+  sky.update(dt, pc.position);
+  if (sky.hour < lastHour) { save.data.day++; UI.toast(`☀️ Ngày ${save.data.day}`); }
+  lastHour = sky.hour;
+  save.data.hour = sky.hour;
+  if (sky.isNight && !fireflies) fireflies = weather(W.scene, 'fireflies');
+  if (!sky.isNight && fireflies) { fireflies.dispose(); fireflies = null; }
+  fireflies?.update(dt, pc.position);
+  clouds.forEach((c, i) => { c.position.x += dt * (0.5 + (i % 3) * 0.3); if (c.position.x > 70) c.position.x = -70; });
+
+  hud.innerHTML = `🪙 ${save.data.coins}<small>Ngày ${save.data.day} · ${pad(sky.hour)}:${pad((sky.hour % 1) * 60)}</small>`;
+  particles.update(dt);
+  fx.render(dt);
+});
+
+document.getElementById('play').addEventListener('click', () => {
+  unlockAudio();
+  Music.start('calm');
+  document.getElementById('start').remove();
+  document.documentElement.requestFullscreen?.().catch(() => {});
+  screen.orientation?.lock?.('landscape').catch(() => {});
+  UI.toast('Nhặt hết xu quanh làng!');
+});
+</script>
+</body>
+</html>

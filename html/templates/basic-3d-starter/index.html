@@ -39,7 +39,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); // giới hạn để điện thoại không nóng
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -123,10 +123,10 @@ let camYaw = 0;
 let stepTimer = 0;
 
 // ---------- Vòng lặp ----------
-const clock = new THREE.Clock();
+const timer = new THREE.Timer(); timer.connect(document);
 const camTarget = new THREE.Vector3();
 function loop() {
-  const dt = Math.min(clock.getDelta(), 0.05);
+  timer.update(); const dt = Math.min(timer.getDelta(), 0.05);
   const mv = input.move;
   const mag = Math.min(Math.hypot(mv.x, mv.y), 1);
 

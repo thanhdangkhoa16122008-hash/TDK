@@ -1,0 +1,531 @@
+{
+ "models/kenney-arena/banner.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 32
+ },
+ "models/kenney-arena/block.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 13
+ },
+ "models/kenney-arena/border-corner.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 21
+ },
+ "models/kenney-arena/border-straight.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 16
+ },
+ "models/kenney-arena/bricks.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 23
+ },
+ "models/kenney-arena/character-soldier.glb": {
+  "animations": [
+   "static",
+   "idle",
+   "walk",
+   "sprint",
+   "jump",
+   "fall",
+   "crouch",
+   "sit",
+   "drive",
+   "die",
+   "pick-up",
+   "emote-yes",
+   "emote-no",
+   "holding-right",
+   "holding-left",
+   "holding-both",
+   "holding-right-shoot",
+   "holding-left-shoot",
+   "holding-both-shoot",
+   "attack-melee-right",
+   "attack-melee-left",
+   "attack-kick-right",
+   "attack-kick-left",
+   "interact-right",
+   "interact-left",
+   "wheelchair-sit",
+   "wheelchair-look-left",
+   "wheelchair-look-right",
+   "wheelchair-move-forward",
+   "wheelchair-move-back",
+   "wheelchair-move-left",
+   "wheelchair-move-right"
+  ],
+  "skinned": true,
+  "kb": 219
+ },
+ "models/kenney-arena/column-damaged.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 24
+ },
+ "models/kenney-arena/column.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 27
+ },
+ "models/kenney-arena/floor-detail.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 16
+ },
+ "models/kenney-arena/floor.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 12
+ },
+ "models/kenney-arena/stairs-corner-inner.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 17
+ },
+ "models/kenney-arena/stairs-corner.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 19
+ },
+ "models/kenney-arena/stairs.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 15
+ },
+ "models/kenney-arena/statue.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 60
+ },
+ "models/kenney-arena/tree.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 43
+ },
+ "models/kenney-arena/trophy.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 33
+ },
+ "models/kenney-arena/wall-corner.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 32
+ },
+ "models/kenney-arena/wall-gate.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 40
+ },
+ "models/kenney-arena/wall.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 26
+ },
+ "models/kenney-arena/weapon-rack.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 30
+ },
+ "models/kenney-arena/weapon-spear.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 17
+ },
+ "models/kenney-arena/weapon-sword.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 19
+ },
+ "models/kenney-city/building-garage.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 29
+ },
+ "models/kenney-city/building-small-a.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 49
+ },
+ "models/kenney-city/building-small-b.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 58
+ },
+ "models/kenney-city/building-small-c.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 78
+ },
+ "models/kenney-city/building-small-d.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 48
+ },
+ "models/kenney-city/grass-trees-tall.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 56
+ },
+ "models/kenney-city/grass-trees.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 47
+ },
+ "models/kenney-city/grass.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 14
+ },
+ "models/kenney-city/pavement-fountain.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 24
+ },
+ "models/kenney-city/pavement.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 13
+ },
+ "models/kenney-city/road-corner.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 21
+ },
+ "models/kenney-city/road-intersection.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 23
+ },
+ "models/kenney-city/road-split.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 19
+ },
+ "models/kenney-city/road-straight-lightposts.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 28
+ },
+ "models/kenney-city/road-straight.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 16
+ },
+ "models/kenney-fps/blaster-repeater.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 74
+ },
+ "models/kenney-fps/blaster.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 67
+ },
+ "models/kenney-fps/cloud.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 32
+ },
+ "models/kenney-fps/enemy-flying.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 65
+ },
+ "models/kenney-fps/grass-small.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 18
+ },
+ "models/kenney-fps/grass.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 18
+ },
+ "models/kenney-fps/platform-large-grass.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 26
+ },
+ "models/kenney-fps/platform.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 26
+ },
+ "models/kenney-fps/wall-high.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 29
+ },
+ "models/kenney-fps/wall-low.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 26
+ },
+ "models/kenney-platformer/block-coin.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 74
+ },
+ "models/kenney-platformer/brick-particle.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 16
+ },
+ "models/kenney-platformer/brick.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 32
+ },
+ "models/kenney-platformer/character.glb": {
+  "animations": [
+   "static",
+   "idle",
+   "walk",
+   "jump"
+  ],
+  "skinned": false,
+  "kb": 95
+ },
+ "models/kenney-platformer/cloud.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 33
+ },
+ "models/kenney-platformer/coin.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 32
+ },
+ "models/kenney-platformer/dust.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 43
+ },
+ "models/kenney-platformer/flag.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 23
+ },
+ "models/kenney-platformer/grass-small.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 19
+ },
+ "models/kenney-platformer/grass.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 19
+ },
+ "models/kenney-platformer/platform-falling.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 27
+ },
+ "models/kenney-platformer/platform-grass-large-round.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 21
+ },
+ "models/kenney-platformer/platform-large.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 33
+ },
+ "models/kenney-platformer/platform-medium.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 27
+ },
+ "models/kenney-platformer/platform.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 23
+ },
+ "models/kenney-racing/decoration-empty.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 64
+ },
+ "models/kenney-racing/decoration-forest.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 195
+ },
+ "models/kenney-racing/decoration-tents.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 174
+ },
+ "models/kenney-racing/track-bump.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 27
+ },
+ "models/kenney-racing/track-corner.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 111
+ },
+ "models/kenney-racing/track-finish.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 34
+ },
+ "models/kenney-racing/track-straight.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 21
+ },
+ "models/kenney-racing/track-tents.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 174
+ },
+ "models/kenney-racing/vehicle-motorcycle.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 105
+ },
+ "models/kenney-racing/vehicle-truck-green.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 112
+ },
+ "models/kenney-racing/vehicle-truck-purple.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 87
+ },
+ "models/kenney-racing/vehicle-truck-red.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 100
+ },
+ "models/kenney-racing/vehicle-truck-yellow.glb": {
+  "animations": [],
+  "skinned": false,
+  "kb": 101
+ },
+ "models/quaternius/robot.glb": {
+  "animations": [
+   "Dance",
+   "Death",
+   "Idle",
+   "Jump",
+   "No",
+   "Punch",
+   "Running",
+   "Sitting",
+   "Standing",
+   "ThumbsUp",
+   "Walking",
+   "WalkJump",
+   "Wave",
+   "Yes"
+  ],
+  "skinned": true,
+  "kb": 453
+ },
+ "sounds/kenney-city/ambience.mp3": {
+  "kb": 944
+ },
+ "sounds/kenney-city/placement-a.mp3": {
+  "kb": 2
+ },
+ "sounds/kenney-city/placement-b.mp3": {
+  "kb": 3
+ },
+ "sounds/kenney-city/placement-c.mp3": {
+  "kb": 2
+ },
+ "sounds/kenney-city/placement-d.mp3": {
+  "kb": 3
+ },
+ "sounds/kenney-city/removal-a.mp3": {
+  "kb": 4
+ },
+ "sounds/kenney-city/removal-b.mp3": {
+  "kb": 3
+ },
+ "sounds/kenney-city/removal-c.mp3": {
+  "kb": 3
+ },
+ "sounds/kenney-city/removal-d.mp3": {
+  "kb": 3
+ },
+ "sounds/kenney-city/rotate.mp3": {
+  "kb": 1
+ },
+ "sounds/kenney-city/toggle.mp3": {
+  "kb": 1
+ },
+ "sounds/kenney-fps/blaster.mp3": {
+  "kb": 10
+ },
+ "sounds/kenney-fps/blaster_repeater.mp3": {
+  "kb": 7
+ },
+ "sounds/kenney-fps/enemy_attack.mp3": {
+  "kb": 5
+ },
+ "sounds/kenney-fps/enemy_destroy.mp3": {
+  "kb": 15
+ },
+ "sounds/kenney-fps/enemy_hurt.mp3": {
+  "kb": 3
+ },
+ "sounds/kenney-fps/jump_a.mp3": {
+  "kb": 4
+ },
+ "sounds/kenney-fps/jump_b.mp3": {
+  "kb": 4
+ },
+ "sounds/kenney-fps/jump_c.mp3": {
+  "kb": 4
+ },
+ "sounds/kenney-fps/land.mp3": {
+  "kb": 2
+ },
+ "sounds/kenney-fps/walking.mp3": {
+  "kb": 34
+ },
+ "sounds/kenney-fps/weapon_change.mp3": {
+  "kb": 6
+ },
+ "sounds/kenney-platformer/break.mp3": {
+  "kb": 6
+ },
+ "sounds/kenney-platformer/coin.mp3": {
+  "kb": 2
+ },
+ "sounds/kenney-platformer/fall.mp3": {
+  "kb": 3
+ },
+ "sounds/kenney-platformer/jump.mp3": {
+  "kb": 2
+ },
+ "sounds/kenney-platformer/land.mp3": {
+  "kb": 2
+ },
+ "sounds/kenney-platformer/walking.mp3": {
+  "kb": 8
+ },
+ "sounds/kenney-racing/engine-motorcycle.mp3": {
+  "kb": 90
+ },
+ "sounds/kenney-racing/engine.mp3": {
+  "kb": 84
+ },
+ "sounds/kenney-racing/impact.mp3": {
+  "kb": 5
+ },
+ "sounds/kenney-racing/skid.mp3": {
+  "kb": 37
+ }
+}
