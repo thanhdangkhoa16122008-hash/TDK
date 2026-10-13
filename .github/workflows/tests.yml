@@ -1,0 +1,98 @@
+name: TDK tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tdk-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  html:
+    name: HTML regression and builds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright Chromium
+        run: |
+          npx playwright install --with-deps chromium
+          browser_path=$(node -p "require('playwright').chromium.executablePath()")
+          echo "CHROMIUM_PATH=$browser_path" >> "$GITHUB_ENV"
+      - name: Run HTML tests and double builds
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          set -o pipefail
+          npm run test:html 2>&1 | tee "$RUNNER_TEMP/html-tests.log"
+      - name: Retain test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: html-test-evidence
+          path: |
+            ${{ runner.temp }}/html-tests.log
+            ${{ runner.temp }}/tdk-*/**/results.json
+            ${{ runner.temp }}/tdk-*/**/hashes.json
+            ${{ runner.temp }}/tdk-*/*.png
+          if-no-files-found: warn
+          retention-days: 14
+
+  godot:
+    name: Godot addon regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Install verified Godot 4.6.3
+        working-directory: ${{ runner.temp }}
+        run: |
+          archive=Godot_v4.6.3-stable_linux.x86_64.zip
+          curl --fail --location --retry 3 --output "$archive" "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/$archive"
+          # Published SHA512-SUMS.txt from the official 4.6.3-stable release.
+          echo "a035258da32b77f966a5376f9fa29c30a6adde826a85ba918e1605bd1fc9823eba7d85f1dd5e748956bd2ba72827c0025ffa11bb82aec91128c407a2e723c99c  $archive" | sha512sum --check
+          mkdir -p godot-bin
+          unzip -q "$archive" -d godot-bin
+          chmod +x godot-bin/Godot_v4.6.3-stable_linux.x86_64
+          echo "GODOT_PATH=$RUNNER_TEMP/godot-bin/Godot_v4.6.3-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Run Godot tests
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          set -o pipefail
+          npm run test:godot 2>&1 | tee "$RUNNER_TEMP/godot-tests.log"
+      - name: Retain test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: godot-test-evidence
+          path: |
+            ${{ runner.temp }}/godot-tests.log
+            ${{ runner.temp }}/tdk-godot-*/*.log
+          if-no-files-found: warn
+          retention-days: 14

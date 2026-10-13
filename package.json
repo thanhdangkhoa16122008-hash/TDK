@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "npm run test:html && npm run test:godot",
-    "test:html": "node --test tests/*.test.cjs",
+    "test:html": "node --test --test-concurrency=2 tests/*.test.cjs",
     "test:godot": "node tests/run-godot.cjs"
   },
   "devDependencies": {
