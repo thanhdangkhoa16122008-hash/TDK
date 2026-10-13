@@ -1,0 +1,13 @@
+{
+  "name": "tdk-game-kit",
+  "private": true,
+  "scripts": {
+    "test": "npm run test:html && npm run test:godot",
+    "test:html": "node --test --test-concurrency=2 tests/*.test.cjs",
+    "test:godot": "node tests/run-godot.cjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "playwright": "1.62.1"
+  }
+}

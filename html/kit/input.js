@@ -2,22 +2,43 @@
 // Cần nạp trước: <script src="../../libs/input/nipplejs.min.js"></script>
 // Dùng: const input = createInput({ buttons: ['jump', 'action'] });
 //   mỗi frame đọc input.move.x / input.move.y (-1..1), input.pressed('jump') (true 1 lần mỗi lần bấm)
+//   input.destroy() khi rời game: gỡ listener, joystick và DOM của instance; gọi lặp an toàn.
 export function createInput({ buttons = ['jump'], labels = {} } = {}) {
-  const state = { move: { x: 0, y: 0 }, held: new Set(), queue: new Set() };
+  const state = { move: { x: 0, y: 0 }, queue: new Set() };
+  const keys = new Set();
+  const pointers = new Map();
+  const keyMap = { Space: 'jump', KeyE: 'action', KeyF: 'action', ShiftLeft: 'run' };
+  let destroyed = false;
+  let joy = null;
+  const cleanup = [];
+  const listen = (target, type, handler) => {
+    target.addEventListener(type, handler);
+    cleanup.push(() => target.removeEventListener(type, handler));
+  };
+  const reset = () => {
+    keys.clear();
+    pointers.forEach((ids) => ids.clear());
+    state.queue.clear();
+    state.move.x = state.move.y = 0;
+  };
+  listen(window, 'blur', reset);
+  listen(document, 'visibilitychange', () => { if (document.hidden) reset(); });
+  const onJoystickMove = (event, d = event.data) => {
+    if (destroyed || !d || !d.vector) return;
+    const f = Math.min(d.force ?? 1, 1);
+    state.move.x = d.vector.x * f;
+    state.move.y = d.vector.y * f;
+  };
+  const onJoystickEnd = () => { state.move.x = 0; state.move.y = 0; };
 
   // Joystick nửa trái màn hình
   const zone = document.createElement('div');
   Object.assign(zone.style, { position: 'fixed', left: 0, top: 0, width: '50%', height: '100%', zIndex: 10, touchAction: 'none' });
   document.body.appendChild(zone);
   if (window.nipplejs) {
-    const joy = window.nipplejs.create({ zone, mode: 'dynamic', color: 'white', size: 110 });
-    joy.on('move', (_, d) => {
-      if (!d || !d.vector) return;
-      const f = Math.min(d.force ?? 1, 1);
-      state.move.x = d.vector.x * f;
-      state.move.y = d.vector.y * f;
-    });
-    joy.on('end', () => { state.move.x = 0; state.move.y = 0; });
+    joy = window.nipplejs.create({ zone, mode: 'dynamic', color: 'white', size: 110 });
+    joy.on('move', onJoystickMove);
+    joy.on('end', onJoystickEnd);
   }
 
   // Nút bên phải
@@ -31,27 +52,27 @@ export function createInput({ buttons = ['jump'], labels = {} } = {}) {
       width: '72px', height: '72px', borderRadius: '50%', border: '2px solid rgba(255,255,255,.7)',
       background: 'rgba(0,0,0,.35)', color: '#fff', font: 'bold 13px system-ui', touchAction: 'none', userSelect: 'none',
     });
-    const down = (e) => { e.preventDefault(); state.held.add(name); state.queue.add(name); };
-    const up = (e) => { e.preventDefault(); state.held.delete(name); };
-    b.addEventListener('pointerdown', down);
-    b.addEventListener('pointerup', up);
-    b.addEventListener('pointerleave', up);
+    if (!pointers.has(name)) pointers.set(name, new Set());
+    const ids = pointers.get(name);
+    const down = (e) => { e.preventDefault(); ids.add(e.pointerId); state.queue.add(name); };
+    const up = (e) => { e.preventDefault(); ids.delete(e.pointerId); };
+    listen(b, 'pointerdown', down);
+    listen(b, 'pointerup', up);
+    listen(b, 'pointerleave', up);
+    listen(b, 'pointercancel', up);
+    listen(b, 'lostpointercapture', up);
     bar.appendChild(b);
   }
 
   // Bàn phím (PC)
-  const keys = new Set();
-  const keyMap = { Space: 'jump', KeyE: 'action', KeyF: 'action', ShiftLeft: 'run' };
-  addEventListener('keydown', (e) => {
+  listen(window, 'keydown', (e) => {
     if (keys.has(e.code)) return;
     keys.add(e.code);
     const n = keyMap[e.code];
-    if (n) { state.held.add(n); state.queue.add(n); }
+    if (n) state.queue.add(n);
   });
-  addEventListener('keyup', (e) => {
+  listen(window, 'keyup', (e) => {
     keys.delete(e.code);
-    const n = keyMap[e.code];
-    if (n) state.held.delete(n);
   });
 
   return {
@@ -61,9 +82,26 @@ export function createInput({ buttons = ['jump'], labels = {} } = {}) {
       if (kx || ky) { const l = Math.hypot(kx, ky); return { x: kx / l, y: ky / l }; }
       return state.move;
     },
-    held: (n) => state.held.has(n),
+    held: (n) => !!pointers.get(n)?.size || [...keys].some((code) => keyMap[code] === n),
     pressed: (n) => { const v = state.queue.has(n); state.queue.delete(n); return v; },
     keyMap,
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      cleanup.splice(0).forEach((remove) => remove());
+      try {
+        if (joy) {
+          joy.off('move', onJoystickMove);
+          joy.off('end', onJoystickEnd);
+          joy.destroy();
+        }
+      } finally {
+        joy = null;
+        reset();
+        zone.remove();
+        bar.remove();
+      }
+    },
   };
 }
 

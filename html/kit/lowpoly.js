@@ -105,6 +105,9 @@ export function fence({ length = 4, color = 0xa47148 } = {}) {
 
 // Cây trồng theo giai đoạn 0..3 (hạt → mầm → lớn → chín)
 export function crop({ stage = 3, fruit = 0xff7043 } = {}) {
+  if (!Number.isInteger(stage) || stage < 0 || stage > 3) {
+    throw new RangeError('crop: stage phải là số nguyên từ 0 đến 3');
+  }
   const g = new THREE.Group();
   const soil = mesh(new THREE.BoxGeometry(0.9, 0.1, 0.9), 0x6d4c41);
   soil.position.y = 0.05;
@@ -182,12 +185,23 @@ export function character({ skin = 0xffcc99, shirt = 0x1e88e5, pants = 0x37474f,
 
 // Rải ngẫu nhiên vật thể trên vùng vuông, tránh bán kính trung tâm
 export function scatter(scene, factory, { count = 20, area = 40, avoid = 4, seed = 7 } = {}) {
-  let s = seed;
+  if (!Number.isSafeInteger(count) || count < 0 || !Number.isFinite(area) || area <= 0 ||
+      !Number.isFinite(avoid) || avoid < 0 || !Number.isSafeInteger(seed)) {
+    throw new RangeError('scatter: count phải là số nguyên ≥ 0; area > 0; avoid ≥ 0; seed là số nguyên hữu hạn');
+  }
+  if (count > 0 && avoid >= (area / 2) * Math.SQRT2) {
+    throw new RangeError('scatter: avoid phủ hết vùng rải; hãy tăng area hoặc giảm avoid');
+  }
+  let s = ((seed % 2147483647) + 2147483647) % 2147483647 || 1;
   const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
   const out = [];
   for (let i = 0; i < count; i++) {
     let x, z;
+    let attempts = 0;
     do {
+      if (++attempts > 10000) {
+        throw new RangeError('scatter: không tìm được vị trí sau 10000 lần thử; hãy tăng area hoặc giảm avoid');
+      }
       x = (rnd() - 0.5) * area;
       z = (rnd() - 0.5) * area;
     } while (Math.hypot(x, z) < avoid);
