@@ -29,12 +29,14 @@ html/
     save.js              lưu game (có phiên bản, tự lưu, xuất/nhập mã sao lưu)
     textures.js          texture tự vẽ: cỏ, đất, gỗ, gạch, gạch men, giấy dán tường cũ, bê tông, vết máu
     fx.js                hạt hiệu ứng, mưa/tuyết/đom đóm/bụi, rung camera
+    anime.js             nhân vật nữ anime bằng code: tô bóng hoạt hình + viền, mắt to chớp, 5 biểu cảm, 4 kiểu tóc, 5 động tác
     lowpoly.js           model low-poly bằng code: cây, đá, nhà, hàng rào, cây trồng 4 giai đoạn, nhân vật
     sfx.js               12 hiệu ứng âm thanh + nhạc nền tự sinh (calm / happy / horror)
   templates/           Game mẫu chạy được — copy ra để làm game mới
     adventure-3d-starter/  góc nhìn thứ 3: nhân vật Kenney có animation, địa hình, ngày/đêm, xu, lưu game
     horror-fps-starter/    kinh dị góc nhìn thứ nhất: biệt thự, đèn pin hết pin, cửa, chìa khóa, bóng ma, nỗi sợ
     basic-3d-starter/      bản tối giản, không dùng file model
+    character-viewer/      xem nhân vật anime xoay 360°, đổi tóc/màu/biểu cảm/động tác
   tools/
     build-single.mjs     đóng gói game thành MỘT file .html offline (nhúng cả model/âm thanh)
     test-game.mjs        chạy thử như điện thoại: bắt lỗi, đo FPS, giả lập điều khiển, chụp màn hình

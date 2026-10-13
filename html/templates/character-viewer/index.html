@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Nhân vật Anime TDK</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f3e9f5; font-family: system-ui, sans-serif; touch-action: none; }
+  canvas { display: block; }
+  #panel { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px;
+    background: linear-gradient(transparent, #ffffffd9 30%); }
+  .row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; align-items: center; }
+  .row::-webkit-scrollbar { display: none; }
+  .lbl { font: 700 12px system-ui; color: #6b5470; min-width: 62px; white-space: nowrap; }
+  button { flex: none; border: 0; border-radius: 18px; padding: 8px 14px; font: 700 13px system-ui; background: #fff; color: #4a3550; box-shadow: 0 1px 3px #0002; }
+  button.on { background: #7b4bd8; color: #fff; }
+  .sw { width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 3px solid #fff; }
+  .sw.on { border-color: #7b4bd8; }
+  #title { position: fixed; top: 12px; left: 0; right: 0; text-align: center; font: 800 16px system-ui; color: #6b5470; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "../../libs/three/three.module.min.js", "three/addons/": "../../libs/three/addons/" } }
+</script>
+</head>
+<body>
+<div id="title">Kéo để xoay · chụm 2 ngón để phóng to</div>
+<div id="panel">
+  <div class="row" id="anims"><span class="lbl">Động tác</span></div>
+  <div class="row" id="hairs"><span class="lbl">Kiểu tóc</span></div>
+  <div class="row" id="colors"><span class="lbl">Màu tóc</span></div>
+  <div class="row" id="faces"><span class="lbl">Biểu cảm</span></div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createAnimeGirl } from '../../kit/anime.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf3e9f5);
+const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 50);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minDistance = 0.8; controls.maxDistance = 6;
+controls.maxPolarAngle = Math.PI * 0.55;
+const fit = () => {
+  const portrait = innerHeight > innerWidth;
+  camera.position.set(0.6, 1.15, portrait ? 4.6 : 3.4);
+  controls.target.set(0, portrait ? 0.72 : 0.85, 0);
+  controls.update();
+};
+fit();
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd8c8e0, 1.6));
+const key = new THREE.DirectionalLight(0xffffff, 2.2);
+key.position.set(2, 4, 3); key.castShadow = true; key.shadow.bias = -0.0015; key.shadow.normalBias = 0.02; key.shadow.mapSize.set(1024, 1024);
+Object.assign(key.shadow.camera, { left: -1.5, right: 1.5, top: 2, bottom: -0.5 });
+scene.add(key);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(1.4, 48), new THREE.MeshToonMaterial({ color: 0xe6d6ec }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+scene.add(ground);
+
+const state = { hair: 'long', color: 0x5b3a8c, anim: 'idle', face: 'neutral' };
+let girl = null;
+function build() {
+  if (girl) scene.remove(girl.object);
+  girl = createAnimeGirl({ hair: state.hair, hairColor: state.color });
+  scene.add(girl.object);
+  girl.anim.play(state.anim);
+  girl.setExpression(state.face);
+  window.__game = { stats: () => ({ hair: state.hair, anim: girl.anim.currentName, parts: girl.parts.length }) };
+}
+build();
+window.__v = { camera, controls, state, build, get girl() { return girl; } };
+
+const group = (id, items, cur, onPick, swatch) => {
+  const row = document.getElementById(id);
+  items.forEach(([label, value]) => {
+    const b = document.createElement('button');
+    if (swatch) { b.className = 'sw'; b.style.background = '#' + value.toString(16).padStart(6, '0'); b.title = label; }
+    else b.textContent = label;
+    if (value === cur) b.classList.add('on');
+    b.onclick = () => { row.querySelectorAll('button').forEach((x) => x.classList.remove('on')); b.classList.add('on'); onPick(value); };
+    row.appendChild(b);
+  });
+};
+group('anims', [['Đứng', 'idle'], ['Đi', 'walk'], ['Chạy', 'run'], ['Vẫy tay', 'wave'], ['Nhảy', 'jump']], state.anim, (v) => { state.anim = v; girl.anim.play(v); });
+group('hairs', [['Tóc dài', 'long'], ['Hai bím', 'twintail'], ['Đuôi ngựa', 'ponytail'], ['Ngắn', 'short']], state.hair, (v) => { state.hair = v; build(); });
+group('colors', [['Tím', 0x5b3a8c], ['Đen', 0x2a2228], ['Nâu', 0x7a4a2e], ['Hồng', 0xf48fb1], ['Bạch kim', 0xeae0c8], ['Xanh', 0x3a7bd5], ['Đỏ', 0xb3263a]], state.color, (v) => { state.color = v; girl.setColors({ hair: v }); }, true);
+group('faces', [['Bình thường', 'neutral'], ['Cười', 'smile'], ['Ngạc nhiên', 'surprised'], ['Buồn', 'sad'], ['Giận', 'angry']], state.face, (v) => { state.face = v; girl.setExpression(v); });
+
+const timer = new THREE.Timer();
+timer.connect(document);
+renderer.setAnimationLoop((t) => {
+  timer.update(t);
+  girl.anim.update(Math.min(timer.getDelta(), 0.05));
+  controls.update();
+  renderer.render(scene, camera);
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); fit();
+});
+</script>
+</body>
+</html>
