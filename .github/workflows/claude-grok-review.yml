@@ -1,0 +1,46 @@
+name: Claude + Grok AI Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Question, code review task, or game design challenge"
+        required: true
+        type: string
+      claude_model:
+        description: "Claude model ID"
+        required: true
+        default: "claude-sonnet-5-5"
+        type: string
+      grok_model:
+        description: "Grok model ID"
+        required: true
+        default: "grok-4.7"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  ai-review:
+    name: Compare AI answers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ask Claude and Grok
+        env:
+          TASK: ${{ inputs.task }}
+          CLAUDE_MODEL: ${{ inputs.claude_model }}
+          GROK_MODEL: ${{ inputs.grok_model }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+        run: python3 scripts/ai_bridge.py
+      - name: Upload comparison report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-grok-review
+          path: ai-review.md
+          retention-days: 7
+          if-no-files-found: warn
