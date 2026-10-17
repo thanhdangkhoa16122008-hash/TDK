@@ -30,6 +30,7 @@ const CSS = `
 .hud-paper{box-sizing:border-box;background:#d9cfb4;color:#2a2018;border-radius:4px;box-shadow:0 10px 40px #000;max-width:min(620px,92vw);max-height:88vh;overflow:auto;padding:16px 22px;font:16px/1.5 Georgia,serif;position:relative}
 .hud-paper h3{margin:0 0 8px;font:700 18px Georgia,serif;color:#5a1a10}
 .hud-paper pre{white-space:pre-wrap;font:inherit;margin:0}
+.hud-paper .hud-row{position:sticky;bottom:-16px;margin:10px -22px -16px;padding:8px 22px;background:#d9cfb4ee}
 .hud-paper img{display:block;max-width:100%;max-height:52vh;margin:0 auto 8px;border:1px solid #0003}
 .hud-row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
 .hud-btn{background:#2a1a12;color:#fff;border:1px solid #ffffff40;border-radius:10px;padding:10px 18px;font:700 15px system-ui;touch-action:manipulation}
