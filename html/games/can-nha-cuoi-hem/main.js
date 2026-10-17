@@ -497,6 +497,8 @@ for (const p of props.h) thing(p.focusW, () => (S.flags.final ? null : '🚪 Tr�
 // ---------- Trốn ----------
 const hideLook = { yaw: 0, pitch: 0 };
 let lightBeforeHide = true;
+// ra khỏi tủ bằng cách đẩy cần đi: phải thả cần một lần sau khi vào (tránh vừa vào đã bật ra), rồi đẩy giữ ~0.25s
+let hideArmed = false, hidePushT = 0;
 function hide(p) {
   if (hunter.state === 'hunt' && Math.hypot(hunter.pos.x - pc.position.x, hunter.pos.z - pc.position.z) < 1.4) { caught(); return; }
   hiddenIn = p;
@@ -505,9 +507,10 @@ function hide(p) {
   pc.body.velocity.set(0, 0, 0);
   lightBeforeHide = lightOn;
   lightOn = false;
+  hideArmed = false; hidePushT = 0;
   HUD.slats(true);
   SFX.play('door', { volume: 0.5, rate: 1.5 });
-  HUD.subNow('Đang trốn trong tủ... nín thở. Bấm ✋ để ra.');
+  HUD.subNow('Đang trốn trong tủ... nín thở. Bấm ✋ hoặc đẩy cần đi để ra.');
 }
 function unhide() {
   const p = hiddenIn;
@@ -515,8 +518,10 @@ function unhide() {
   HUD.slats(false);
   SFX.play('door', { volume: 0.5, rate: 1.4 });
   const e = p.g.localToWorld(p.exitLocal.clone());
-  pc.body.position.set(e.x, 0.2, e.z);
+  pc.body.position.set(e.x, 0.05, e.z);
   pc.body.velocity.set(0, 0, 0);
+  pc.position.set(e.x, 0.05, e.z);
+  pc.look.take();
   pc.yaw = p.g.rotation.y + Math.PI; pc.pitch = 0;
   lightOn = lightBeforeHide && S.battery > 0.01;
 }
@@ -896,9 +901,17 @@ function findTarget() {
   for (const c of cands.slice(0, 3)) if (c.t.los === false || losClear(cam, c.t.pos)) return c;
   return null;
 }
-function updateInteract() {
+function updateInteract(dt) {
   const press = input.pressed('action');
-  if (hiddenIn) { UI.prompt('✋ Ra khỏi tủ'); HUD.cross(false); if (press) unhide(); return; }
+  if (hiddenIn) {
+    UI.prompt('✋ hoặc đẩy cần đi để ra khỏi tủ');
+    HUD.cross(false);
+    const mag = Math.hypot(input.move.x, input.move.y);
+    if (!hideArmed && mag < 0.3) hideArmed = true;
+    hidePushT = hideArmed && mag > 0.5 ? hidePushT + dt : 0;
+    if (press || hidePushT > 0.25) unhide();
+    return;
+  }
   const best = findTarget();
   UI.prompt(best ? best.lbl : null);
   HUD.cross(!!best);
@@ -950,7 +963,7 @@ W.start((dt, t) => {
   updateLightning(dt);
   if (!busy) {
     updateFlashlight(dt);
-    updateInteract();
+    updateInteract(dt);
     updateHunt(dt);
     updateScares(dt);
     if (!hiddenIn && pc.speed01 > 0.1 && (stepT -= dt) <= 0) { SFX.playVaried('step'); stepT = pc.speed01 > 0.7 ? 0.32 : 0.5; }

@@ -81,14 +81,19 @@ const el = (cls, parent = document.body, tag = 'div') => {
 const btn = (parent, text, cls = 'hud-btn') => {
   const b = el(cls, parent, 'button');
   b.textContent = text;
-  let pid = null, last = 0;
-  const fire = (e) => { if (b.disabled) return; last = performance.now(); b.onclick?.(e); };
+  let pid = null, viaPointer = 0;
+  const fire = (e) => { if (!b.disabled) b.onclick?.(e); };
   b.addEventListener('pointerdown', (e) => { e.stopPropagation(); pid = e.pointerId; });
-  b.addEventListener('pointerup', (e) => { if (e.pointerId !== pid) return; pid = null; fire(e); });
+  b.addEventListener('pointerup', (e) => { if (e.pointerId !== pid) return; pid = null; viaPointer = performance.now(); fire(e); });
   b.addEventListener('pointercancel', () => (pid = null));
   b.addEventListener('pointerleave', () => (pid = null));
-  // click thật (bàn phím Enter/Space, .click()) chỉ chạy khi pointerup chưa xử lý; chặn onclick gốc để không chạy 2 lần
-  b.addEventListener('click', (e) => { e.stopImmediatePropagation(); if (performance.now() - last > 500) fire(e); }, true);
+  // click đi kèm lần chạm vừa xử lý ở pointerup thì bỏ (tránh chạy 2 lần); click khác (bàn phím, .click()) vẫn chạy
+  b.addEventListener('click', (e) => {
+    e.stopImmediatePropagation();
+    if (viaPointer && performance.now() - viaPointer < 800) { viaPointer = 0; return; }
+    viaPointer = 0;
+    fire(e);
+  }, true);
   return b;
 };
 
