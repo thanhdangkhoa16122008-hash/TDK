@@ -78,6 +78,11 @@ const MELODY = [
 ];
 export function musicBox({ vol = 0.5, speed = 1 } = {}) {
   const beat = 0.32 / speed;
+  // mỗi lần phát có bus riêng để dừng được (tránh nhiều bản chồng lên nhau)
+  const bus = ctx.createGain();
+  bus.gain.value = 1;
+  bus.connect(out());
+  const oscs = [];
   let t = ctx.currentTime + 0.05;
   for (const [n, len] of MELODY) {
     if (n) {
@@ -88,13 +93,22 @@ export function musicBox({ vol = 0.5, speed = 1 } = {}) {
         g.gain.setValueAtTime(0, t);
         g.gain.linearRampToValueAtTime(0.09 * vol * gmul, t + 0.005);
         g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
-        o.connect(g).connect(out());
+        o.connect(g).connect(bus);
         o.start(t); o.stop(t + 1.7);
+        oscs.push(o);
       }
     }
     t += beat * len;
   }
-  return (t - ctx.currentTime) * 1000;
+  const end = t + 1.8;
+  return {
+    duration: (end - ctx.currentTime) * 1000,
+    stop() {
+      if (ctx.currentTime >= end) return;
+      bus.gain.setTargetAtTime(0, ctx.currentTime, 0.12);
+      setTimeout(() => { oscs.forEach((o) => { try { o.stop(); } catch (e) {} }); bus.disconnect(); }, 600);
+    },
+  };
 }
 
 // Tiếng động ngẫu nhiên trong nhà: gõ cửa, thì thầm, bước chân xa

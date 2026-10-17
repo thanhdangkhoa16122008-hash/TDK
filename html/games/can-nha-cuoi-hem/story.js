@@ -69,7 +69,7 @@ export function objective(S) {
   if (f.final) return 'CHẠY! Mở cửa chính ở phòng khách.';
   if (!f.studyOpen && !has('brass')) return S.notes.includes('intro') ? 'Tìm hũ bánh trong bếp.' : 'Cửa chính bị khóa. Lục soát phòng khách.';
   if (!f.studyOpen) return 'Mở phòng làm việc (cuối hành lang, bên trái).';
-  if (!S.notes.includes('diary')) return 'Lục soát phòng làm việc.';
+  if (!S.notes.includes('diary') && !f.safeOpen) return 'Lục soát phòng làm việc.';
   if (!f.safeOpen && !f.power) return has('fuse') ? 'Lắp cầu chì vào hộp điện trong nhà kho.' : 'Nhà mất điện. Tìm cầu chì và hộp điện.';
   if (!f.safeOpen) return 'Mở két sắt. Mật mã là giờ đồng hồ quả lắc dừng.';
   const placed = ['photo', 'doll', 'musicbox'].filter((i) => f['altar_' + i]).length;

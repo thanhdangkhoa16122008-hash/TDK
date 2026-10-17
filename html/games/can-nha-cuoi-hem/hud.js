@@ -12,7 +12,7 @@ const CSS = `
 .cine .tdk-hotbar,.cine .hud-obj{opacity:0}
 .tdk-slot{width:44px!important;height:44px!important;font-size:22px!important}
 .tdk-slot.sel{border-color:#ffffff40!important;background:rgba(0,0,0,.45)!important}
-.tdk-hotbar{bottom:max(8px,env(safe-area-inset-bottom))!important}
+.tdk-hotbar{bottom:max(8px,env(safe-area-inset-bottom))!important;left:calc(50% - 90px)!important}
 .tdk-bars{top:max(10px,env(safe-area-inset-top))!important;left:max(12px,env(safe-area-inset-left))!important}
 .hud-obj{top:36px;left:max(12px,env(safe-area-inset-left));max-width:42vw;font-size:13px;font-weight:600;line-height:1.3;color:#d8d2c4;text-shadow:0 1px 3px #000;pointer-events:none;transition:color .4s}
 .hud-obj.new{color:#ffd54f}
@@ -27,7 +27,7 @@ const CSS = `
 .hud-red{inset:0;pointer-events:none;z-index:25;opacity:0;background:radial-gradient(ellipse at center,transparent 45%,#a0000099 100%);transition:opacity .3s}
 .hud-slats{inset:0;pointer-events:none;z-index:24;display:none;background:repeating-linear-gradient(180deg,#000 0 18px,transparent 18px 34px),radial-gradient(ellipse at center,transparent 40%,#000 100%)}
 .hud-modal{inset:0;z-index:80;background:#000c;display:flex;align-items:center;justify-content:center;padding:10px}
-.hud-paper{background:#d9cfb4;color:#2a2018;border-radius:4px;box-shadow:0 10px 40px #000;max-width:min(620px,92vw);max-height:88vh;overflow:auto;padding:16px 22px;font:16px/1.5 Georgia,serif;position:relative}
+.hud-paper{box-sizing:border-box;background:#d9cfb4;color:#2a2018;border-radius:4px;box-shadow:0 10px 40px #000;max-width:min(620px,92vw);max-height:88vh;overflow:auto;padding:16px 22px;font:16px/1.5 Georgia,serif;position:relative}
 .hud-paper h3{margin:0 0 8px;font:700 18px Georgia,serif;color:#5a1a10}
 .hud-paper pre{white-space:pre-wrap;font:inherit;margin:0}
 .hud-paper img{display:block;max-width:100%;max-height:52vh;margin:0 auto 8px;border:1px solid #0003}
@@ -35,7 +35,7 @@ const CSS = `
 .hud-btn{background:#2a1a12;color:#fff;border:1px solid #ffffff40;border-radius:10px;padding:10px 18px;font:700 15px system-ui;touch-action:manipulation}
 .hud-btn:active{filter:brightness(1.4)}
 .hud-btn.gold{background:#b8860b;border-color:#ffd54f}
-.hud-panel{background:#16141a;border:1px solid #ffffff25;border-radius:16px;padding:14px 18px;box-shadow:0 10px 40px #000;max-height:92vh;overflow:auto}
+.hud-panel{box-sizing:border-box;background:#16141a;border:1px solid #ffffff25;border-radius:16px;padding:14px 18px;box-shadow:0 10px 40px #000;max-height:92vh;overflow:auto}
 .hud-panel h2{margin:0 0 8px;font:700 18px Georgia,serif;text-align:center;color:#e8e0d0}
 .kp{display:flex;gap:18px;align-items:center}
 .kp-left{display:flex;flex-direction:column;gap:10px;align-items:center;width:200px}
@@ -43,7 +43,8 @@ const CSS = `
 .kp-disp.bad{color:#ff5050;text-shadow:0 0 8px #f33;animation:shake .3s}
 .kp-disp.ok{color:#9dffaa;background:#0a2a0a}
 @keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
-.kp-hint{font-size:12px;color:#999;text-align:center}
+.kp-hint{font-size:12px;color:#999;text-align:center;max-width:220px}
+.kp-hint.warn{color:#ffcf6a;font-size:13px}
 .kp-grid{display:grid;grid-template-columns:repeat(3,58px);gap:8px}
 .kp-grid button{height:50px;border-radius:10px;border:1px solid #555;background:#2a2a30;color:#fff;font:700 22px system-ui;touch-action:manipulation}
 .kp-grid button:active{background:#4a4a55}
@@ -57,6 +58,14 @@ const CSS = `
 .end h1{margin:0;font:800 30px Georgia,serif;color:#e8e0d0;letter-spacing:3px}
 .end pre{white-space:pre-wrap;font:16px/1.6 Georgia,serif;color:#bbb;max-width:600px;margin:0}
 .end .st{font-size:13px;color:#888}
+button:disabled{opacity:.5}
+@media (max-height:340px){
+.hud-panel{padding:8px 14px}.hud-panel h2{font-size:15px;margin:0 0 4px}
+.kp-grid button{height:40px}.kp-disp{height:42px;font-size:28px}
+.sl-w canvas{width:60px;height:60px}.sl-w button{width:64px;height:30px}.sl{margin:2px 0}
+.hud-row{margin-top:6px}.hud-btn{padding:8px 14px}
+.hud-paper{padding:10px 16px;font-size:15px}
+}
 `;
 
 let root = null;
@@ -66,7 +75,21 @@ const el = (cls, parent = document.body, tag = 'div') => {
   parent.appendChild(e);
   return e;
 };
-const btn = (parent, text, cls = 'hud-btn') => { const b = el(cls, parent, 'button'); b.textContent = text; b.addEventListener('pointerdown', (e) => e.stopPropagation()); return b; };
+// Nút kích hoạt bằng pointerup: Chrome Android hủy "click" khi còn một ngón khác đang chạm màn hình
+// (vd. ngón trái đang giữ joystick), nên không dựa vào click. Hành động gán qua b.onclick như bình thường.
+const btn = (parent, text, cls = 'hud-btn') => {
+  const b = el(cls, parent, 'button');
+  b.textContent = text;
+  let pid = null, last = 0;
+  const fire = (e) => { if (b.disabled) return; last = performance.now(); b.onclick?.(e); };
+  b.addEventListener('pointerdown', (e) => { e.stopPropagation(); pid = e.pointerId; });
+  b.addEventListener('pointerup', (e) => { if (e.pointerId !== pid) return; pid = null; fire(e); });
+  b.addEventListener('pointercancel', () => (pid = null));
+  b.addEventListener('pointerleave', () => (pid = null));
+  // click thật (bàn phím Enter/Space, .click()) chỉ chạy khi pointerup chưa xử lý; chặn onclick gốc để không chạy 2 lần
+  b.addEventListener('click', (e) => { e.stopImmediatePropagation(); if (performance.now() - last > 500) fire(e); }, true);
+  return b;
+};
 
 let objEl, subEl, crossEl, fadeEl, slatsEl, roomEl, redEl;
 const subQueue = [];
@@ -108,13 +131,16 @@ export const HUD = {
 
   // Phụ đề tự ẩn (độc thoại ngắn, không cần chạm)
   sub(html, ms) {
-    subQueue.push([html, ms || Math.max(2400, html.replace(/<[^>]+>/g, '').length * 60)]);
+    if (subQueue.some((q) => q[0] === html)) return; // không lặp câu đang chờ
+    subQueue.push([html, ms || Math.max(2400, html.replace(/<[^>]+>/g, '').length * 60), performance.now()]);
     if (!subBusy) this._nextSub();
   },
   // xóa hàng chờ và hiện ngay câu mới
-  subNow(html, ms) { subQueue.length = 0; subBusy = true; subQueue.push([html, ms || Math.max(2400, html.replace(/<[^>]+>/g, '').length * 60)]); this._nextSub(); },
+  subNow(html, ms) { subQueue.length = 0; subBusy = true; subQueue.push([html, ms || Math.max(2400, html.replace(/<[^>]+>/g, '').length * 60), performance.now()]); this._nextSub(); },
   _nextSub() {
     clearTimeout(subTimer);
+    // câu chờ quá 9 giây đã lỗi thời (sự kiện đã qua) → bỏ
+    while (subQueue.length && performance.now() - subQueue[0][2] > 9000) subQueue.shift();
     const n = subQueue.shift();
     if (!n) { subBusy = false; subEl.style.opacity = 0; return; }
     subBusy = true;
@@ -141,7 +167,8 @@ export const HUD = {
       document.exitPointerLock?.();
       const o = el('hud hud-modal tdk-ui');
       o.addEventListener('pointerdown', (e) => e.stopPropagation());
-      const close = (v) => { o.remove(); HUD.open--; resolve(v); };
+      let closed = false;
+      const close = (v) => { if (closed) return; closed = true; o.remove(); HUD.open = Math.max(0, HUD.open - 1); resolve(v); };
       build(o, close);
     });
   },
@@ -159,7 +186,7 @@ export const HUD = {
     });
   },
 
-  // Bàn phím số. check(code) → true nếu đúng. Trả về true (mở được) / false (bỏ đi)
+  // Bàn phím số. check(code) → true nếu đúng, hoặc chuỗi gợi ý / false nếu sai. Trả về true (mở được) / false (bỏ đi)
   keypad({ title, hint = '', len = 4, check }) {
     return this._modal((o, close) => {
       const p = el('hud-panel', o);
@@ -167,11 +194,12 @@ export const HUD = {
       const kp = el('kp', p);
       const left = el('kp-left', kp);
       const disp = el('kp-disp', left);
-      el('kp-hint', left).textContent = hint;
+      const hintEl = el('kp-hint', left);
+      hintEl.textContent = hint;
       const lrow = el('hud-row', left);
       btn(lrow, 'Thoát ✕').onclick = () => done(false);
       const grid = el('kp-grid', kp);
-      let code = '', lock = false;
+      let code = '', lock = false, solved = false, finished = false;
       const show = () => (disp.textContent = code.padEnd(len, '_'));
       show();
       const press = (k) => {
@@ -180,12 +208,15 @@ export const HUD = {
         else if (k === '✓') {
           if (code.length < len) return;
           lock = true;
-          if (check(code)) {
+          const res = check(code);
+          if (res === true) {
+            solved = true;
             disp.classList.add('ok'); disp.textContent = 'MỞ';
             SFX.play('unlock');
             setTimeout(() => done(true), 700);
           } else {
             disp.classList.add('bad'); disp.textContent = 'SAI';
+            if (typeof res === 'string') { hintEl.textContent = res; hintEl.classList.add('warn'); }
             SFX.play('error');
             setTimeout(() => { disp.classList.remove('bad'); code = ''; show(); lock = false; }, 800);
           }
@@ -206,16 +237,24 @@ export const HUD = {
         else if (e.key === 'Escape') done(false);
       };
       addEventListener('keydown', onKey);
-      function done(v) { removeEventListener('keydown', onKey); close(v); }
+      function done(v) {
+        if (finished || (solved && !v)) return; // đã đúng mã thì không cho "Thoát" làm mất kết quả
+        finished = true;
+        removeEventListener('keydown', onKey);
+        close(v);
+      }
     });
   },
 
-  // Ổ khóa nhiều vòng hình. check(['star','fish',...]) → true nếu đúng
+  // Ổ khóa nhiều vòng hình. check(['star','fish',...]) → true nếu đúng, hoặc chuỗi gợi ý / false nếu sai
   symbolLock({ title, hint = '', shapes, len = 3, start = [], check }) {
     return this._modal((o, close) => {
       const p = el('hud-panel', o);
       el('', p, 'h2').textContent = title;
-      if (hint) { const h = el('kp-hint', p); h.textContent = hint; h.style.marginBottom = '4px'; }
+      const hintEl = el('kp-hint', p);
+      hintEl.textContent = hint;
+      Object.assign(hintEl.style, { marginBottom: '4px', maxWidth: 'none' });
+      let solved = false;
       const row = el('sl', p);
       const idx = Array.from({ length: len }, (_, i) => start[i] ?? 0);
       const wheels = [];
@@ -231,18 +270,28 @@ export const HUD = {
           drawShape(g, shapes[idx[i]], 84, 84, 58);
           nm.textContent = SHAPE_NAME[shapes[idx[i]]] || '';
         };
-        up.onclick = () => { idx[i] = (idx[i] + shapes.length - 1) % shapes.length; SFX.play('lock'); draw(); };
-        dn.onclick = () => { idx[i] = (idx[i] + 1) % shapes.length; SFX.play('lock'); draw(); };
+        up.onclick = () => { if (solved) return; idx[i] = (idx[i] + shapes.length - 1) % shapes.length; SFX.play('lock'); draw(); };
+        dn.onclick = () => { if (solved) return; idx[i] = (idx[i] + 1) % shapes.length; SFX.play('lock'); draw(); };
         draw();
         wheels.push(cv);
       }
       const r = el('hud-row', p);
       r.style.justifyContent = 'center';
-      btn(r, 'Thoát ✕').onclick = () => close(false);
+      btn(r, 'Thoát ✕').onclick = () => { if (!solved) close(false); };
       const ok = btn(r, 'Mở khóa', 'hud-btn gold');
       ok.onclick = () => {
-        if (check(idx.map((k) => shapes[k]))) { SFX.play('unlock'); ok.textContent = '✓'; setTimeout(() => close(true), 500); }
-        else { SFX.play('error'); wheels.forEach((c) => { c.style.animation = 'shake .3s'; setTimeout(() => (c.style.animation = ''), 320); }); }
+        if (solved) return;
+        const res = check(idx.map((k) => shapes[k]));
+        if (res === true) {
+          solved = true;
+          p.querySelectorAll('button').forEach((b) => (b.disabled = true));
+          SFX.play('unlock'); ok.textContent = '✓';
+          setTimeout(() => close(true), 500);
+        } else {
+          SFX.play('error');
+          if (typeof res === 'string') { hintEl.textContent = res; hintEl.classList.add('warn'); }
+          wheels.forEach((c) => { c.style.animation = 'shake .3s'; setTimeout(() => (c.style.animation = ''), 320); });
+        }
       };
     });
   },
@@ -255,7 +304,12 @@ export const HUD = {
       if (!list.length) el('kp-hint', box).textContent = 'Chưa có ghi chép nào.';
       for (const n of list) {
         const b = btn(box, '📄 ' + n.title);
-        b.onclick = async () => { o.style.display = 'none'; HUD.open--; await HUD.note(n); HUD.open++; o.style.display = 'flex'; };
+        b.onclick = async () => {
+          if (o.style.display === 'none') return;
+          o.style.display = 'none'; HUD.open--;
+          await HUD.note(n);
+          HUD.open++; o.style.display = 'flex';
+        };
       }
       const r = el('hud-row', p);
       btn(r, 'Đóng ✕').onclick = () => close();
@@ -272,7 +326,10 @@ export const HUD = {
       for (const it of items) {
         const b = btn(box, typeof it.label === 'function' ? it.label() : it.label, it.gold ? 'hud-btn gold' : 'hud-btn');
         b.onclick = async () => {
-          const res = await it.action?.();
+          if (o.dataset.busy) return;
+          o.dataset.busy = '1';
+          let res;
+          try { res = await it.action?.(); } finally { delete o.dataset.busy; }
           if (it.close !== false) close(res);
           else if (typeof it.label === 'function') b.textContent = it.label();
         };
@@ -285,7 +342,9 @@ export const HUD = {
     el('', e, 'h1').textContent = title;
     el('', e, 'pre').textContent = text;
     el('st', e).textContent = stats;
-    btn(e, 'Chơi lại', 'hud-btn gold').onclick = onRestart;
+    const b = btn(e, 'Chơi lại', 'hud-btn gold');
+    b.onclick = () => { b.disabled = true; onRestart(); };
+    return e;
     e.style.opacity = 0; e.style.transition = 'opacity 2s';
     requestAnimationFrame(() => (e.style.opacity = 1));
   },

@@ -8,7 +8,7 @@ import { createWorld } from '../../kit/world.js';
 import { createPostFX } from '../../kit/postfx.js';
 import { buildGridLevel } from '../../kit/level.js';
 import { PlayerController } from '../../kit/controls.js';
-import { createInput, requireLandscape } from '../../kit/input.js';
+import { createInput, requireLandscape, goFullscreenLandscape } from '../../kit/input.js';
 import { SFX, Music, unlockAudio } from '../../kit/sfx.js';
 import { Tex } from '../../kit/textures.js';
 import { UI } from '../../kit/ui.js';
@@ -20,7 +20,8 @@ import { HUD } from './hud.js';
 import { Ambience, Drone, musicBox, randomCreak } from './audio.js';
 import { ITEMS, NOTES, objective, INTRO, INTRO_SLAM, FINAL, ENDING } from './story.js';
 
-requireLandscape();
+// xoay dọc giữa chừng → tự tạm dừng (pauseMenu là function nên gọi được trước khi khai báo)
+requireLandscape(undefined, () => pauseMenu());
 
 // ---------- Bản đồ (mỗi ô 2.4m) ----------
 // # tường  W cửa sổ  D cửa  . sàn  P người chơi  g điểm hù ở hành lang
@@ -28,7 +29,7 @@ requireLandscape();
 //         r tủ lạnh  x hộp điện  l kệ  m gương+tủ cầu chì  U bồn tắm  d bàn+nhật ký  s két sắt  K kệ sách
 //         q thư của mẹ  o giường+búp bê  v tranh  y giường bé  t rương  a bàn thờ
 const MAP = `
-###W########W###W####
+####W#######W###W####
 #.jk.b#xb.#m.#.d...s#
 #..T..#...#.U#K.....#
 #h...r#l..#..#b....h#
@@ -53,8 +54,8 @@ const BASE_HEMI = 0.15;
 W.hemi.intensity = BASE_HEMI;
 W.hemi.color.set(0x7a88b8);
 W.hemi.groundColor.set(0x1a140e);
-W.sun.intensity = 0;
-W.sun.castShadow = false;
+// không dùng mặt trời: gỡ hẳn khỏi cảnh (đèn intensity 0 vẫn tốn công tính trong shader)
+W.scene.remove(W.sun, W.sun.target);
 
 const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -20, 0) });
 const L = buildGridLevel(W.scene, world, CANNON, MAP, {
@@ -138,11 +139,13 @@ const LAMP_AT = [[3.5, 8.5], [3, 2], [8, 2], [11.5, 2], [16.5, 2], [2.5, 5], [9.
 const lampStat = new THREE.Group();
 W.scene.add(lampStat);
 const M = materials();
+const shadeMat = M.rust.clone();
+shadeMat.side = THREE.DoubleSide; // chao đèn hở: nhìn từ dưới lên vẫn thấy mặt trong
 const lamps = LAMP_AT.map(([gx, gz]) => {
   const p = toWorld(gx, gz);
   const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.45, 4), M.black);
   cord.position.set(p.x, WALL_H - 0.22, p.z);
-  const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.22, 0.16, 10, 1, true), M.rust);
+  const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.22, 0.16, 10, 1, true), shadeMat);
   shade.position.set(p.x, WALL_H - 0.5, p.z);
   lampStat.add(cord, shade);
   const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshBasicMaterial({ color: 0x1a1410 }));
@@ -165,7 +168,11 @@ const save = createSave('can-nha-cuoi-hem', {
   defaults: { started: false, inv: [], taken: {}, flags: {}, notes: [], visited: {}, battery: 1, deaths: 0, time: 0, pos: null, yaw: Math.PI, sens: 1 },
 });
 let S = save.data;
+// thiết lập (độ nhạy) lưu riêng để không mất khi chơi lại
+const cfg = createSave('can-nha-cuoi-hem-cfg', { defaults: { sens: S.sens ?? 1 } });
 const SENS = [0.0035, 0.006, 0.009], SENS_NAME = ['Thấp', 'Vừa', 'Cao'];
+// trình duyệt/khung xem có cho lưu không (iframe sandbox có thể chặn localStorage)
+const canSave = (() => { try { localStorage.setItem('tdk-probe', '1'); localStorage.removeItem('tdk-probe'); return true; } catch (e) { return false; } })();
 
 // ---------- Người chơi ----------
 const input = createInput({ buttons: ['light', 'action'], labels: { light: '🔦', action: '✋' } });
@@ -178,7 +185,7 @@ for (const b of document.querySelectorAll('button')) {
 const startPos = toWorld(3, 10);
 const pc = new PlayerController({
   world, CANNON, input, camera: W.camera, mode: 'first', start: new THREE.Vector3(startPos.x, 0.2, startPos.z),
-  walk: 2.5, run: 4.3, jump: 0, radius: 0.3, sensitivity: SENS[S.sens ?? 1],
+  walk: 2.5, run: 4.3, jump: 0, radius: 0.3, sensitivity: SENS[cfg.data.sens] ?? SENS[1],
 });
 pc.yaw = Math.PI;
 W.scene.add(W.camera);
@@ -209,13 +216,15 @@ girl.visible = false;
 W.scene.add(girl);
 
 // ---------- Kho đồ ----------
-const bar = UI.hotbar(6);
-bar.onSelect = (i, it) => { if (it) HUD.subNow(`${ITEMS[it.id].icon} <b>${ITEMS[it.id].name}</b> — ${ITEMS[it.id].desc}`); };
+// cùng lúc giữ tối đa 3 món (+ chìa cổng ở cuối) → 4 ô là đủ, chừa chỗ cho nút 🔦 trên màn hẹp
+const bar = UI.hotbar(4);
+bar.onSelect = (i, it) => { if (it) UI.toast(`${ITEMS[it.id].icon} ${ITEMS[it.id].name}: ${ITEMS[it.id].desc}`, 3500); };
 const has = (i) => S.inv.includes(i);
-function refreshInv() { for (let i = 0; i < 6; i++) bar.set(i, S.inv[i] ? { id: S.inv[i], icon: ITEMS[S.inv[i]].icon } : null); }
-function give(i) {
+function refreshInv() { for (let i = 0; i < bar.items.length; i++) bar.set(i, S.inv[i] ? { id: S.inv[i], icon: ITEMS[S.inv[i]].icon } : null); }
+function give(i, quiet) {
   if (!has(i)) S.inv.push(i);
   refreshInv();
+  if (quiet) return;
   SFX.play('pickup');
   UI.toast(`${ITEMS[i].icon} ${ITEMS[i].name}`);
 }
@@ -229,6 +238,16 @@ function checkpoint() {
   HUD.objective(objective(S));
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// gen tăng mỗi khi có sự kiện lớn (bị bắt, cảnh kết, thắng, chơi lại) → các chuỗi hiệu ứng cũ tự hủy
+let gen = 0;
+// chờ ms rồi chờ tiếp tới khi đang chơi (không mở bảng/tạm dừng); trả false nếu chuỗi đã bị hủy
+async function waitPlay(ms, g) {
+  await wait(ms);
+  while (g === gen && (HUD.open > 0 || mode !== 'play')) await wait(100);
+  return g === gen;
+}
+// chạy fn sau ms nếu chuỗi chưa bị hủy (âm thanh, phụ đề phụ)
+const later = (ms, fn) => { const g = gen; setTimeout(() => { if (g === gen) fn(); }, ms); };
 const clamp = THREE.MathUtils.clamp;
 
 // ---------- Hiệu ứng chuyển động nhỏ ----------
@@ -316,43 +335,48 @@ props.b.forEach((p, i) => {
   W.scene.add(m);
   p.battery = m;
   addGlint(m.position.clone().setY(m.position.y + 0.25), () => !S.taken[id]);
-  thing(m.position, () => (S.taken[id] ? null : '🔋 Nhặt pin'), () => {
+  thing(m.position, () => (S.taken[id] ? null : `🔋 Nhặt pin (đèn ${Math.round(S.battery * 100)}%)`), () => {
+    const gain = Math.min(1, S.battery + 0.6) - S.battery;
+    if (gain < 0.08) { HUD.subNow('Đèn pin còn gần đầy. Để dành cục pin này sau.'); return; }
     S.taken[id] = true; m.visible = false;
-    S.battery = Math.min(1, S.battery + 0.6); lightOn = true;
+    S.battery += gain; lightOn = true;
     SFX.play('battery');
-    UI.toast('🔋 Pin đèn pin +60%');
+    UI.toast(`🔋 Pin đèn pin +${Math.round(gain * 100)}%`);
     checkpoint();
   }, { range: 2.0 });
 });
 
 // nhà kho: hộp điện
 const fuseBox = one('x');
-thing(fuseBox.focusW, () => (S.flags.power ? null : has('fuse') ? '🔌 Lắp cầu chì' : '⚡ Xem hộp điện'), async () => {
-  if (!has('fuse')) { await readNote('fusebox'); return; }
+thing(fuseBox.focusW, () => (S.flags.power ? null : has('fuse') ? '🔌 Lắp cầu chì' : '⚡ Xem hộp điện'), () => {
+  if (!has('fuse')) return readNote('fusebox');
   take('fuse');
   S.flags.power = true;
-  SFX.play('lock'); await wait(350);
-  SFX.play('hum'); SFX.play('unlock');
-  syncVisuals();
-  HUD.subNow('Có điện rồi! Két sắt trong phòng làm việc chắc đã dùng được.');
   huntTimer = 28;
+  syncVisuals();
   checkpoint();
+  SFX.play('lock');
+  later(350, () => { SFX.play('hum'); SFX.play('unlock'); HUD.subNow('Có điện rồi! Két sắt trong phòng làm việc chắc đã dùng được.'); });
 });
 
 // nhà tắm: tủ dưới gương (cầu chì) + hù trong gương
 const mirror = one('m');
-thing(mirror.focusW, () => (S.taken.fuse ? null : '🚪 Mở tủ dưới gương'), async () => {
+thing(mirror.focusW, () => (S.taken.fuse ? null : '🚪 Mở tủ dưới gương'), () => {
   S.taken.fuse = true; give('fuse');
   checkpoint();
-  await wait(700);
+  mirrorScare();
+});
+async function mirrorScare() {
+  const g = gen;
+  if (!(await waitPlay(700, g))) return;
   // ngẩng lên nhìn gương...
-  for (let i = 0; i < 20; i++) { pc.pitch += (0.05 - pc.pitch) * 0.2; await wait(25); }
+  for (let i = 0; i < 20; i++) { pc.pitch += (0.05 - pc.pitch) * 0.2; if (!(await waitPlay(25, g))) return; }
   mirror.ghostFace.visible = true;
   SFX.play('scream', { volume: 0.7 }); SFX.play('glitch'); fx.flash(0.3); shake.add(0.5);
   await wait(380);
   mirror.ghostFace.visible = false;
-  HUD.subNow('...!! Trong gương... Chắc mình hoa mắt.');
-});
+  if (g === gen) HUD.subNow('...!! Trong gương... Chắc mình hoa mắt.');
+}
 addGlint(mirror.focusW.clone().setY(0.9), () => !S.taken.fuse);
 thing(one('U').focusW, () => '🛁 Bồn tắm', () => HUD.subNow('Nước đen kịt. Mình không muốn biết dưới đáy có gì.'));
 
@@ -369,21 +393,20 @@ thing(safe.focusW, () => (S.flags.safeOpen ? null : '🔐 Két sắt'), async ()
     check: (c) => {
       if (c === '2345') return true;
       safeWrong++;
-      if (c === '1145') HUD.subNow('Không phải... Ba ghi giờ theo kiểu 24 giờ, mà lúc đó là ban đêm.');
-      else if (safeWrong >= 2) HUD.subNow(seen('diary') ? 'Mã là giờ chiếc đồng hồ quả lắc dừng lại (xem lại nhật ký 📖).' : 'Có lẽ trong phòng này có ghi chép gì đó...');
+      if (c === '1145') return 'Gần đúng... Ba ghi giờ theo kiểu 24 giờ, mà lúc đó là ban đêm.';
+      if (safeWrong >= 2) return seen('diary') ? 'Mã là giờ chiếc đồng hồ quả lắc dừng lại, viết kiểu 24 giờ.' : 'Có lẽ trong phòng này có ghi chép gì đó...';
       return false;
     },
   });
   if (!ok) return;
+  // đổi trạng thái + đưa đồ NGAY rồi lưu, hiệu ứng chạy sau (tải lại giữa chừng không mất đồ)
   S.flags.safeOpen = true;
+  give('photo', true); give('child', true);
+  checkpoint();
   tween(safe.door.rotation, 'y', -1.9, 1.2);
   SFX.play('door', { rate: 1.3 });
-  await wait(600);
-  give('photo');
-  await wait(500);
-  give('child');
-  HUD.subNow('Tấm ảnh cả nhà... và chìa khóa phòng bé Hạnh.');
-  checkpoint();
+  later(600, () => { SFX.play('pickup'); UI.toast(`${ITEMS.photo.icon} ${ITEMS.photo.name}`); });
+  later(1100, () => { SFX.play('pickup'); UI.toast(`${ITEMS.child.icon} ${ITEMS.child.name}`); HUD.subNow('Tấm ảnh cả nhà... và chìa khóa phòng bé Hạnh.'); });
 });
 
 // phòng ngủ
@@ -395,16 +418,20 @@ doll.position.copy(bed.g.localToWorld(bed.itemPos.clone()));
 doll.rotation.y = bed.g.rotation.y + 0.6;
 W.scene.add(doll);
 addGlint(doll.position.clone().setY(doll.position.y + 0.45), () => !S.taken.doll);
-thing(doll.position.clone().setY(doll.position.y + 0.15), () => (S.taken.doll ? null : '🧸 Nhặt búp bê'), async () => {
+thing(doll.position.clone().setY(doll.position.y + 0.15), () => (S.taken.doll ? null : '🧸 Nhặt búp bê'), () => {
   S.taken.doll = true; doll.visible = false; give('doll');
   checkpoint();
-  await wait(500);
+  dollScare();
+});
+async function dollScare() {
+  const g = gen;
+  if (!(await waitPlay(500, g))) return;
   if (DOORS.bedroom.isOpen) DOORS.bedroom.close();
   SFX.play('slam'); shake.add(0.6); blackout = 2.5;
-  await wait(400);
+  if (!(await waitPlay(400, g))) return;
   SFX.play('whisper');
   HUD.subNow('<i>"Trả... Mi-Mi... cho em..."</i>');
-});
+}
 
 // phòng bé
 thing(one('v').focusW, () => '🖍️ Xem bức tranh', () => readNote('drawing'), { range: 2.6 });
@@ -416,20 +443,22 @@ thing(chest.focusW, () => (S.flags.chestOpen ? null : '🔒 Rương bí mật'),
     title: 'Ổ khóa 3 hình', hint: 'Xoay ▲▼ để chọn hình, rồi bấm Mở khóa', shapes: SHAPES, len: 3, start: [3, 4, 3],
     check: (arr) => {
       if (arr.join() === CHEST_ANSWER.join()) return true;
-      if (++chestWrong >= 2) HUD.subNow('Bức tranh trên tường có đánh số các bạn của Hạnh...');
+      if (++chestWrong >= 2) return seen('drawing') ? 'Bức tranh trên tường có đánh số các bạn của Hạnh: 1 → 2 → 3.' : 'Hạnh nói thứ tự nằm trong BỨC TRANH trên tường...';
       return false;
     },
   });
   if (!ok) return;
   S.flags.chestOpen = true;
+  give('musicbox', true);
+  checkpoint();
   chest.lock.visible = false;
   tween(chest.lid.rotation, 'x', -1.3, 1.0);
   SFX.play('door', { rate: 1.6, volume: 0.6 });
-  await wait(700);
-  give('musicbox');
-  musicBox({ vol: 0.45 });
-  HUD.subNow('Hộp nhạc của Hạnh. Bài ru mẹ hay hát...');
-  checkpoint();
+  later(700, () => {
+    SFX.play('pickup'); UI.toast(`${ITEMS.musicbox.icon} ${ITEMS.musicbox.name}`);
+    playBox({ vol: 0.45 });
+    HUD.subNow('Hộp nhạc của Hạnh. Bài ru mẹ hay hát...');
+  });
 });
 thing(one('y').focusW || one('y').g.position.clone().setY(0.6), () => '🛏️ Giường bé', () => HUD.subNow('Chăn vẫn gấp gọn. Trên gối còn vài sợi tóc dài.'));
 
@@ -446,22 +475,20 @@ thing(altar.focusW, () => {
   if (S.flags.final) return null;
   const n = ['photo', 'doll', 'musicbox'].filter((k) => has(k)).length;
   return n ? `🕯️ Đặt lên bàn thờ (${n})` : '🕯️ Bàn thờ';
-}, async () => {
-  const items = ['photo', 'doll', 'musicbox'].filter((k) => has(k));
+}, () => {
+  const ALL = ['photo', 'doll', 'musicbox'];
+  const items = ALL.filter((k) => has(k));
   if (!items.length) {
-    const left = ['photo', 'doll', 'musicbox'].filter((k) => !S.flags['altar_' + k]).length;
-    HUD.subNow(left === 3 ? 'Bàn thờ có ba chỗ trống: một khung ảnh, một vết bụi hình búp bê, một ô vuông nhỏ.' : `Còn ${left} chỗ trống trên bàn thờ.`);
+    if (ALL.every((k) => S.flags['altar_' + k])) { finale(); return; }
+    const missing = ALL.filter((k) => !S.flags['altar_' + k]).map((k) => ITEMS[k].name.toLowerCase());
+    HUD.subNow(missing.length === 3 ? 'Bàn thờ có ba chỗ trống: một khung ảnh, một vết bụi hình búp bê, một ô vuông nhỏ.' : `Bàn thờ còn thiếu: ${missing.join(', ')}.`);
     return;
   }
-  for (const k of items) {
-    take(k); S.flags['altar_' + k] = true;
-    altarItems[k].visible = true;
-    SFX.play('pickup', { rate: 0.7 });
-    await wait(350);
-  }
+  for (const k of items) { take(k); S.flags['altar_' + k] = true; altarItems[k].visible = true; }
+  items.forEach((k, i) => later(i * 300, () => SFX.play('pickup', { rate: 0.7 })));
+  if (ALL.every((k) => S.flags['altar_' + k])) { finale(); return; }
   checkpoint();
-  if (['photo', 'doll', 'musicbox'].every((k) => S.flags['altar_' + k])) finale();
-  else { SFX.play('whisper', { volume: 0.4 }); HUD.subNow('Ngọn nến bùng lên một chút...'); }
+  later(items.length * 300, () => { SFX.play('whisper', { volume: 0.4 }); HUD.subNow('Ngọn nến bùng lên một chút...'); });
 });
 
 // tủ để trốn
@@ -469,12 +496,14 @@ for (const p of props.h) thing(p.focusW, () => (S.flags.final ? null : '🚪 Tr�
 
 // ---------- Trốn ----------
 const hideLook = { yaw: 0, pitch: 0 };
+let lightBeforeHide = true;
 function hide(p) {
-  if (hunter.state === 'hunt' && hunter.pos.distanceTo(pc.position) < 1.4) return caught();
+  if (hunter.state === 'hunt' && Math.hypot(hunter.pos.x - pc.position.x, hunter.pos.z - pc.position.z) < 1.4) { caught(); return; }
   hiddenIn = p;
   hideLook.yaw = 0; hideLook.pitch = -0.05;
   pc.look.take();
   pc.body.velocity.set(0, 0, 0);
+  lightBeforeHide = lightOn;
   lightOn = false;
   HUD.slats(true);
   SFX.play('door', { volume: 0.5, rate: 1.5 });
@@ -489,6 +518,7 @@ function unhide() {
   pc.body.position.set(e.x, 0.2, e.z);
   pc.body.velocity.set(0, 0, 0);
   pc.yaw = p.g.rotation.y + Math.PI; pc.pitch = 0;
+  lightOn = lightBeforeHide && S.battery > 0.01;
 }
 function updateHidden(t) {
   const [dx, dy] = pc.look.take();
@@ -596,7 +626,9 @@ function updateHunt(dt) {
 
 async function caught() {
   if (mode !== 'play') return;
+  const g = ++gen;
   mode = 'dead';
+  acting = false;
   S.deaths++;
   if (hiddenIn) { hiddenIn = null; HUD.slats(false); }
   HUD.clearSubs();
@@ -606,10 +638,13 @@ async function caught() {
   shake.add(1); fx.flash(0.5); HUD.red(1);
   navigator.vibrate?.([200, 60, 300]);
   await wait(900);
+  if (g !== gen) return;
   await HUD.fade(1, 500);
+  if (g !== gen) return;
   hunter.despawn(); Drone.set(0); HUD.red(0); danger = 0;
   respawn();
   await wait(700);
+  if (g !== gen) return;
   mode = 'play';
   HUD.fade(0, 1400);
   if (S.flags.final) { chaseDelay = 3.5; HUD.subNow('<b>Chạy!</b> Ra cửa chính ở phòng khách!'); }
@@ -630,12 +665,22 @@ function respawn() {
 }
 
 // ---------- Kết ----------
-async function finale() {
+function finale() {
+  if (mode !== 'play') return;
+  const g = ++gen;
   mode = 'cutscene';
+  acting = false;
+  // trạng thái cuối được ghi NGAY: tải lại giữa cảnh sẽ vào thẳng đoạn chạy thoát (applyState)
+  S.flags.final = true;
+  give('gate', true);
+  save.write();
   document.exitPointerLock?.();
   HUD.clearSubs();
-  if (hunter.state !== 'off') hunter.despawn();
-  Drone.set(0);
+  hunter.despawn(); chaseDelay = -1; warnT = 0;
+  Drone.set(0); danger = 0; HUD.red(0);
+  finaleScene(g);
+}
+async function finaleScene(g) {
   // hồn bé Hạnh hiện ra giữa người chơi và bàn thờ, quay mặt về phía người chơi
   const ap = altar.g.localToWorld(new THREE.Vector3(0, 0, 0.9));
   const gp = pc.position.clone().setY(0);
@@ -647,24 +692,27 @@ async function finale() {
   girlTarget = 1;
   pc.yaw = Math.atan2(-(gp.x - pc.position.x), -(gp.z - pc.position.z));
   pc.pitch = -0.22;
-  musicBox({ vol: 0.5 });
+  playBox({ vol: 0.5 });
   await wait(1500);
+  if (g !== gen) return;
   document.body.classList.add('cine');
   await UI.story(FINAL);
   document.body.classList.remove('cine');
-  give('gate');
+  if (g !== gen) return;
+  SFX.play('pickup'); UI.toast(`${ITEMS.gate.icon} ${ITEMS.gate.name}`);
   girlTarget = 0;
-  S.flags.final = true;
-  checkpoint();
   await wait(700);
+  if (g !== gen) return;
   SFX.play('scream'); SFX.play('slam'); shake.add(0.8); fx.flash(0.35);
   DOORS.living.open(); DOORS.altar.open();
   HUD.subNow('<b>CHẠY!</b> Ra cửa chính ở phòng khách!', 4000);
   mode = 'play';
   chaseDelay = 2.5;
+  checkpoint();
 }
 async function win() {
   if (mode === 'end') return;
+  const g = ++gen;
   mode = 'end';
   S.flags.won = true;
   take('gate');
@@ -674,14 +722,38 @@ async function win() {
   UI.prompt(null);
   await HUD.fade(1, 2500, '#cfd8e0');
   Music.stop();
-  musicBox({ vol: 0.4, speed: 0.85 });
+  if (g !== gen) return;
+  playBox({ vol: 0.4, speed: 0.85 });
   const m = Math.floor(S.time / 60), s = Math.floor(S.time % 60);
   HUD.ending({
     title: 'CĂN NHÀ CUỐI HẺM', text: ENDING,
     stats: `Thời gian: ${m} phút ${s} giây · Bị bắt: ${S.deaths} lần`,
-    onRestart: () => { save.reset(); location.reload(); },
+    onRestart: restart,
   });
-  save.reset();
+  save.reset(); S = save.data;
+}
+// Chơi lại: xóa tiến trình, tải lại trang; nếu khung xem chặn tải lại thì tự đặt lại ngay trong trang
+function restart() {
+  save.reset(); S = save.data;
+  try { location.reload(); } catch (e) { /* bị chặn */ }
+  setTimeout(softRestart, 1500);
+}
+function softRestart() {
+  ++gen;
+  document.querySelectorAll('.hud-modal, .end').forEach((e) => e.remove());
+  HUD.open = 0;
+  document.body.classList.remove('cine');
+  hunter.despawn(); girl.visible = false; girlTarget = 0;
+  chaseDelay = -1; danger = 0; blackout = 0; warnT = 0; acting = false;
+  if (hiddenIn) { hiddenIn = null; HUD.slats(false); }
+  HUD.red(0); HUD.clearSubs(); UI.prompt(null);
+  tweens.length = 0;
+  for (const d of L.doors) { d.locked = false; d.close(); d.angle = 0; }
+  mirror.ghostFace.visible = false;
+  lightOn = true;
+  Music.start('horror');
+  mode = 'menu';
+  begin(true);
 }
 
 // ---------- Đồng bộ hình ảnh theo trạng thái (khi tải game) ----------
@@ -690,18 +762,32 @@ function syncVisuals() {
   fuseBox.led.material.color.setHex(S.flags.power ? 0x22ff44 : 0x661111);
   safe.screen.material.color.setHex(S.flags.power ? 0x0a3a0a : 0x050805);
 }
+// Sửa save cũ bị kẹt do lưu giữa chừng (bản trước): cờ đã mở mà chưa có đồ, bàn thờ đủ mà chưa có chìa cổng
+function repairSave() {
+  const f = S.flags, add = (i) => { if (!S.inv.includes(i)) S.inv.push(i); };
+  if (f.safeOpen && !f.altar_photo) add('photo');
+  if (f.safeOpen && !f.childOpen) add('child');
+  if (f.chestOpen && !f.altar_musicbox) add('musicbox');
+  if (S.taken.doll && !f.altar_doll) add('doll');
+  if (S.taken.jar && !f.studyOpen) add('brass');
+  if (S.taken.fuse && !f.power) add('fuse');
+  if (['photo', 'doll', 'musicbox'].every((k) => f['altar_' + k]) && !f.won) { f.final = true; add('gate'); }
+  for (const k of ['photo', 'doll', 'musicbox']) if (f['altar_' + k]) S.inv = S.inv.filter((x) => x !== k);
+}
 function applyState() {
+  repairSave();
   refreshInv();
   DOORS.study.locked = !S.flags.studyOpen;
   DOORS.child.locked = !S.flags.childOpen;
   DOORS.front.locked = true;
   props.b.forEach((p, i) => (p.battery.visible = !S.taken['bat' + i]));
   doll.visible = !S.taken.doll;
-  if (S.flags.safeOpen) safe.door.rotation.y = -1.9;
-  if (S.flags.chestOpen) { chest.lid.rotation.x = -1.3; chest.lock.visible = false; }
+  safe.door.rotation.y = S.flags.safeOpen ? -1.9 : 0;
+  chest.lid.rotation.x = S.flags.chestOpen ? -1.3 : 0;
+  chest.lock.visible = !S.flags.chestOpen;
   for (const k in altarItems) altarItems[k].visible = !!S.flags['altar_' + k];
   syncVisuals();
-  pc.sensitivity = SENS[S.sens ?? 1];
+  pc.sensitivity = SENS[cfg.data.sens] ?? SENS[1];
   if (S.flags.final) { respawn(); chaseDelay = 4; DOORS.living.open(); DOORS.altar.open(); }
   else if (S.pos) {
     pc.body.position.set(S.pos[0], 0.2, S.pos[1]); pc.position.set(S.pos[0], 0.2, S.pos[1]);
@@ -712,6 +798,9 @@ function applyState() {
 }
 
 // ---------- Mỗi khung hình ----------
+// hộp nhạc: dừng bản đang phát trước khi phát bản mới
+let curBox = null;
+function playBox(o) { curBox?.stop(); curBox = musicBox(o); }
 let curRoom = null, blackout = 0, boltT = 9, boltFlash = 0, creakT = 25, stepT = 0, girlTarget = 0, acting = false;
 
 function updateRoom() {
@@ -731,11 +820,12 @@ function updateRoom() {
     'Phòng ngủ': 'Phòng ba mẹ. Tủ quần áo to — trốn được nếu cần.',
   }[r];
   if (first) HUD.sub(first);
-  if (r === 'Phòng bé Hạnh' && !S.flags.chestOpen) { musicBox({ vol: 0.18, speed: 0.9 }); HUD.sub('Tiếng hộp nhạc... phát ra từ cái rương?'); }
+  if (r === 'Phòng bé Hạnh' && !S.flags.chestOpen) { playBox({ vol: 0.18, speed: 0.9 }); HUD.sub('Tiếng hộp nhạc... phát ra từ cái rương?'); }
 }
 
 function updateLamps(dt) {
-  const final = S.flags.final, alarm = warnT > 0 || hunter.state === 'hunt';
+  // đèn đỏ chỉ bật khi đã vào đoạn chạy thoát (không bật giữa cảnh bé Hạnh)
+  const final = S.flags.final && mode !== 'cutscene', alarm = warnT > 0 || hunter.state === 'hunt';
   if (warnT > 0) warnT -= dt;
   if (blackout > 0) blackout -= dt;
   const cam = W.camera.position;
@@ -813,8 +903,10 @@ function updateInteract() {
   UI.prompt(best ? best.lbl : null);
   HUD.cross(!!best);
   if (press && best && !acting) {
-    acting = true;
-    Promise.resolve(best.t.act()).catch((e) => console.error(e)).finally(() => (acting = false));
+    let r;
+    try { r = best.t.act(); } catch (e) { console.error(e); }
+    // chỉ act mở bảng (thư, két, rương) trả về promise → chặn bấm chồng cho tới khi bảng đóng
+    if (r && typeof r.then === 'function') { acting = true; r.catch((e) => console.error(e)).finally(() => (acting = false)); }
   }
 }
 
@@ -879,6 +971,7 @@ W.start((dt, t) => {
     g.s.visible = g.on();
     if (g.s.visible) { const k = Math.sin(t * 3 + g.ph); g.s.scale.setScalar(0.16 + 0.06 * k); g.s.material.opacity = 0.55 + 0.45 * k; }
   }
+  if (busy || hunter.state !== 'hunt') danger = Math.max(0, danger - dt);
   // hậu kỳ theo mức nguy hiểm
   fx.set({ vignette: 1.3 + danger * 1.4, chroma: 0.4 + danger * 2.2, saturation: 0.5 - danger * 0.3, grain: 0.35 + danger * 0.3 });
   if (mode === 'play') HUD.red(danger > 0.6 ? (danger - 0.6) * 2 : 0);
@@ -892,13 +985,13 @@ function pauseMenu() {
   if (HUD.open || mode !== 'play') return;
   HUD.menu('Tạm dừng', [
     { label: '▶ Tiếp tục', gold: true },
-    { label: () => 'Độ nhạy nhìn: ' + SENS_NAME[S.sens ?? 1], close: false, action: () => { S.sens = ((S.sens ?? 1) + 1) % 3; pc.sensitivity = SENS[S.sens]; save.write(); } },
+    { label: () => 'Độ nhạy nhìn: ' + SENS_NAME[cfg.data.sens], close: false, action: () => { cfg.data.sens = (cfg.data.sens + 1) % 3; pc.sensitivity = SENS[cfg.data.sens]; cfg.write(); } },
     { label: '📖 Nhật ký', action: () => openJournal() },
     {
       label: '↺ Chơi lại từ đầu',
       action: async () => {
         const yes = await HUD.menu('Xóa tiến trình và chơi lại?', [{ label: 'Không', action: () => false }, { label: 'Có, chơi lại', action: () => true }]);
-        if (yes) { save.reset(); location.reload(); }
+        if (yes) restart();
       },
     },
   ]);
@@ -915,16 +1008,19 @@ addEventListener('keydown', (e) => {
 document.addEventListener('visibilitychange', () => { if (document.hidden) { save.write(); if (mode === 'play') pauseMenu(); } });
 
 async function begin(fresh) {
+  if (mode !== 'menu') return; // chạm đúp nút bắt đầu
+  mode = 'starting';
+  const g = gen;
   unlockAudio();
   Ambience.start();
   Music.start('horror');
-  document.documentElement.requestFullscreen?.().catch(() => {});
-  screen.orientation?.lock?.('landscape').catch(() => {});
-  document.getElementById('start').remove();
+  goFullscreenLandscape();
+  document.getElementById('start')?.remove();
   if (fresh) { save.reset(); S = save.data; S.started = true; }
   applyState();
   mode = 'play';
   W.timer.reset?.();
+  if (!canSave) HUD.sub('⚠ Trình duyệt đang chặn lưu game — tiến trình sẽ mất nếu thoát giữa chừng.', 5000);
   if (!fresh) { HUD.fade(1, 0); HUD.fade(0, 1200); HUD.sub('Tiếp tục...'); checkpoint(); return; }
   // mở đầu: đứng trước cửa chính đang mở, cửa đóng sập
   pc.enabled = false;
@@ -932,6 +1028,7 @@ async function begin(fresh) {
   HUD.fade(1, 0); HUD.fade(0, 1800);
   HUD.sub(INTRO[0][1], 4200);
   await wait(2600);
+  if (g !== gen) return;
   DOORS.front.close(); DOORS.front.locked = true;
   SFX.play('slam'); shake.add(0.7); boltFlash = 0.5;
   setTimeout(() => SFX.play('thunder', { volume: 0.8 }), 400);
@@ -941,14 +1038,32 @@ async function begin(fresh) {
   HUD.sub(W.mobile ? '👆 Vuốt nửa phải màn hình để nhìn · 🕹️ kéo nửa trái để đi · ✋ tương tác' : 'WASD đi · chuột nhìn · E tương tác · F đèn pin', 5000);
   checkpoint();
 }
-document.getElementById('play').addEventListener('click', () => begin(true));
+const playBtn = document.getElementById('play');
 const cont = document.getElementById('continue');
-if (S.started && !S.flags.won) { cont.hidden = false; cont.addEventListener('click', () => begin(false)); }
+const hasProgress = S.started && !S.flags.won;
+let confirmNew = -Infinity;
+playBtn.addEventListener('click', () => {
+  // đang có tiến trình: chạm lần 1 chỉ hỏi lại, chạm lần 2 (trong 4 giây) mới xóa và chơi mới
+  if (hasProgress && performance.now() - confirmNew > 4000) {
+    confirmNew = performance.now();
+    playBtn.textContent = 'CHẠM LẦN NỮA ĐỂ CHƠI MỚI (xóa tiến trình)';
+    setTimeout(() => { if (performance.now() - confirmNew >= 4000) playBtn.textContent = 'CHƠI MỚI'; }, 4100);
+    return;
+  }
+  begin(true);
+});
+if (hasProgress) { cont.hidden = false; playBtn.textContent = 'CHƠI MỚI'; cont.addEventListener('click', () => begin(false)); }
+if (!canSave) {
+  const w = document.createElement('div');
+  w.textContent = '⚠ Trình duyệt/khung xem đang chặn lưu game: tiến trình sẽ mất nếu thoát giữa chừng.';
+  w.style.cssText = 'color:#ffcf6a;font-size:12px;max-width:520px';
+  document.getElementById('start')?.appendChild(w);
+}
 
 // cho công cụ kiểm tra / thử nhanh
 window.__game = {
   get S() { return S; }, pc, L, things, hunter, props, DOORS, toWorld, toGrid, give, finale, win, startHunt, placePlayer,
-  hunt: (cell) => { startHunt(); if (cell) hunter.spawn(cell); }, unhide: () => hiddenIn && unhide(), caught,
+  hunt: (cell) => { startHunt(); if (cell) hunter.spawn(cell); }, unhide: () => hiddenIn && unhide(), caught, restart, softRestart, input,
   get mode() { return mode; },
   stats: () => ({
     mode, room: curRoom, battery: +S.battery.toFixed(2), inv: S.inv.join(','), flags: Object.keys(S.flags).join(','),

@@ -64,9 +64,11 @@ export function createPostFX(W, style = 'bright', { adaptive = true } = {}) {
   fxaa.enabled = !p.pixel;
   composer.addPass(fxaa);
 
+  // level: mức tự hạ chất lượng (khai báo trước set() vì set() đọc nó)
+  let acc = 0, frames = 0, level = 0, enabled = style !== 'none';
   const set = (o) => {
     Object.assign(p, o);
-    bloom.strength = p.bloom; bloom.enabled = p.bloom > 0;
+    bloom.strength = p.bloom; bloom.enabled = p.bloom > 0 && level < 2; // không bật lại bloom sau khi đã tự tắt
     if (p.bloomThreshold !== undefined) bloom.threshold = p.bloomThreshold;
     const u = grade.uniforms;
     u.vignette.value = p.vignette; u.grain.value = p.grain; u.saturation.value = p.saturation;
@@ -76,10 +78,12 @@ export function createPostFX(W, style = 'bright', { adaptive = true } = {}) {
   W.onResize((w, h) => { composer.setSize(w, h); bloom.resolution.set(w / 2, h / 2); });
 
   // Tự hạ chất lượng: nếu FPS < 40 kéo dài → giảm độ phân giải, rồi tắt bloom, rồi tắt hậu kỳ
-  let acc = 0, frames = 0, level = 0, enabled = style !== 'none';
   const degrade = () => {
     level++;
-    if (level === 1) renderer.setPixelRatio(Math.max(1, renderer.getPixelRatio() * 0.75));
+    if (level === 1) {
+      renderer.setPixelRatio(Math.max(1, renderer.getPixelRatio() * 0.75));
+      composer.setPixelRatio(renderer.getPixelRatio()); // composer giữ pixelRatio riêng, phải cập nhật cùng
+    }
     else if (level === 2) { bloom.enabled = false; fxaa.enabled = false; }
     else if (level === 3) { renderer.shadowMap.enabled = false; scene.traverse((o) => o.material && (o.material.needsUpdate = true)); }
     else if (level === 4) enabled = false;

@@ -83,10 +83,14 @@ export const Tex = {
     for (let x = 0; x < S; x += 32) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, S); g.stroke(); }
     g.fillStyle = '#5e503d';
     for (let y = 16; y < S; y += 32) for (let x = 16; x < S; x += 32) { g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); }
+    // vết ố tròn mềm, vẽ lặp ở 4 phía để texture liền mạch khi lặp
     for (let i = 0; i < 25; i++) {
-      const gr = g.createRadialGradient(rnd() * S, rnd() * S, 0, rnd() * S, rnd() * S, 20 + rnd() * 60);
-      gr.addColorStop(0, '#3a2f2066'); gr.addColorStop(1, '#3a2f2000');
-      g.fillStyle = gr; g.fillRect(0, 0, S, S);
+      const x = rnd() * S, y = rnd() * S, r = 20 + rnd() * 60;
+      for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+        const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+        gr.addColorStop(0, '#3a2f2066'); gr.addColorStop(1, '#3a2f2000');
+        g.fillStyle = gr; g.beginPath(); g.arc(x + ox, y + oy, r, 0, Math.PI * 2); g.fill();
+      }
     }
   }, o),
 
