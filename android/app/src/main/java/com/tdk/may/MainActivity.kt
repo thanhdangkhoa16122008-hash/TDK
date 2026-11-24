@@ -320,7 +320,7 @@ class MainActivity : Activity() {
             return File(modelsDir, name).delete()
         }
         @JavascriptInterface fun load(name: String, maxTokens: Int) = llmThread.execute { loadModel(name, maxTokens) }
-        @JavascriptInterface fun toast(msg: String) { this@MainActivity.toast(msg) }
+        @JavascriptInterface fun generate(prompt: String, temperature: Float, topK: Int): Unit = llmThread.execute { this@MainActivity.generate(prompt, temperature, topK) }
         @JavascriptInterface fun stop() { runCatching { session?.cancelGenerateResponseAsync() }; keepScreen(false) }
         @JavascriptInterface fun studio(id: String, base: String, api: String, data: String) = netPool.execute {
             keepScreen(true); try { studioCall(id, base, api, data) } finally { keepScreen(false) }
@@ -334,7 +334,7 @@ class MainActivity : Activity() {
             } catch (e: Exception) { js("onStudio", id, "error", "Không kết nối được: ${e.message}") }
         }
         @JavascriptInterface fun save(url: String, video: Boolean) = netPool.execute { saveMedia(url, video) }
-        @JavascriptInterface fun toast(msg: String) = this@MainActivity.toast(msg)
+        @JavascriptInterface fun toast(msg: String) { this@MainActivity.toast(msg) }
     }
 
     companion object { const val REQ_FILE = 1; const val REQ_IMPORT = 2 }
