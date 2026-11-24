@@ -5,6 +5,7 @@
     python app.py --demo       # thử giao diện, không nạp mô hình
 """
 import argparse
+import json
 import os
 import sys
 import traceback
@@ -112,6 +113,41 @@ def gen_video(desc, use_llm, style, kind, seconds, image, seed):
         raise gr.Error(err(e))
 
 
+# ---------------- API cho app Android ----------------
+def api_chat(message, history_json, think):
+    """Chat không stream cho app điện thoại. history_json: [{"role","content"}…]"""
+    try:
+        hist = [m for m in json.loads(history_json or "[]") if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)]
+    except ValueError:
+        hist = []
+    msgs = [{"role": "system", "content": SYSTEM_PROMPT}] + hist[-20:] + [{"role": "user", "content": str(message)}]
+    answer = ""
+    try:
+        for _, answer in studio.chat_stream(msgs, think=bool(think)):
+            pass
+    except Exception as e:  # noqa: BLE001
+        return err(e)
+    return answer
+
+
+def _msg(e):
+    return getattr(e, "message", None) or str(e)
+
+
+def api_image(*a):
+    try:
+        return gen_image(*a)
+    except Exception as e:  # noqa: BLE001
+        return [], _msg(e) if _msg(e).startswith("⚠️") else f"⚠️ Lỗi: {_msg(e)}"
+
+
+def api_video(*a):
+    try:
+        return gen_video(*a)
+    except Exception as e:  # noqa: BLE001
+        return None, _msg(e) if _msg(e).startswith("⚠️") else f"⚠️ Lỗi: {_msg(e)}"
+
+
 def unload():
     studio.unload()
     return studio.status()
@@ -137,8 +173,8 @@ with gr.Blocks(title="AI Studio — Mây", css=CSS, theme=gr.themes.Soft(primary
         gr.Examples(["Giải thích vì sao bầu trời màu xanh", "Mình có 5 cái kẹo, cho bạn 2 cái, mẹ cho thêm gấp đôi số còn lại. Mình có mấy cái?",
                      "Viết mở đầu một truyện kinh dị về bóng đen trong hành lang", "Vẽ nhân vật hiệp sĩ low-poly cho game",
                      "Làm video bóng đen đứng cuối hành lang tối, đèn chập chờn"], box)
-        send.click(respond, [box, chat, think, chat_style], [box, chat])
-        box.submit(respond, [box, chat, think, chat_style], [box, chat])
+        send.click(respond, [box, chat, think, chat_style], [box, chat], api_name=False)
+        box.submit(respond, [box, chat, think, chat_style], [box, chat], api_name=False)
 
     with gr.Tab("🎨 Tạo ảnh"):
         with gr.Row():
@@ -161,7 +197,7 @@ with gr.Blocks(title="AI Studio — Mây", css=CSS, theme=gr.themes.Soft(primary
             with gr.Column(scale=3):
                 igal = gr.Gallery(label="Kết quả", columns=2, height=520, type="filepath")
                 iinfo = gr.Markdown()
-        ibtn.click(gen_image, [idesc, iuse, istyle, ikind, isize, inum, iseed, ilora, iscale, ineg], [igal, iinfo])
+        ibtn.click(gen_image, [idesc, iuse, istyle, ikind, isize, inum, iseed, ilora, iscale, ineg], [igal, iinfo], api_name=False)
 
     with gr.Tab("🎬 Dựng video"):
         with gr.Row():
@@ -179,14 +215,19 @@ with gr.Blocks(title="AI Studio — Mây", css=CSS, theme=gr.themes.Soft(primary
             with gr.Column(scale=3):
                 vout = gr.Video(label="Kết quả", height=420)
                 vinfo = gr.Markdown()
-        vbtn.click(gen_video, [vdesc, vuse, vstyle, vkind, vsec, vimg, vseed], [vout, vinfo])
+        vbtn.click(gen_video, [vdesc, vuse, vstyle, vkind, vsec, vimg, vseed], [vout, vinfo], api_name=False)
 
     with gr.Tab("⚙️ Hệ thống"):
         stat = gr.Markdown(studio.status())
         with gr.Row():
             gr.Button("Làm mới").click(lambda: studio.status(), None, stat)
             gr.Button("Giải phóng bộ nhớ GPU").click(unload, None, stat)
+        with gr.Row(visible=False):  # điểm gọi API cho app Android
+            a_msg, a_hist, a_think, a_out = gr.Textbox(), gr.Textbox(), gr.Checkbox(), gr.Textbox()
+            gr.Button().click(api_chat, [a_msg, a_hist, a_think], a_out, api_name="chat_api")
+            gr.Button().click(api_image, [idesc, iuse, istyle, ikind, isize, inum, iseed, ilora, iscale, ineg], [igal, iinfo], api_name="tao_anh")
+            gr.Button().click(api_video, [vdesc, vuse, vstyle, vkind, vsec, vimg, vseed], [vout, vinfo], api_name="dung_video")
         gr.Markdown("Huấn luyện thêm (LoRA): xem `ai-studio/README.md`, mục **Huấn luyện**. LoRA ảnh đặt trong `loras/<tên>/`, LoRA chat ở `loras/chat-may/` — khởi động lại app để nhận.")
 
 if __name__ == "__main__":
-    ui.queue(default_concurrency_limit=1).launch(share=args.share, server_name="0.0.0.0", server_port=args.port)
+    ui.queue(default_concurrency_limit=1).launch(share=args.share, server_name="0.0.0.0", server_port=args.port, show_error=True)
