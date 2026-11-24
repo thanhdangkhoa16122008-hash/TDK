@@ -34,9 +34,9 @@
 </div>
 <script type="module">
 import { createChatbot } from '../../kit/chatbot.js';
-import { INTENTS } from '../../kit/chatbot-data.js';
+import { INTENTS, KNOWLEDGE } from '../../kit/chatbot-data.js';
 
-const bot = createChatbot({ intents: INTENTS, botName: 'Mây' });
+const bot = createChatbot({ intents: INTENTS, knowledge: KNOWLEDGE, botName: 'Mây' });
 const t0 = performance.now();
 const info = bot.train();
 document.getElementById('status').textContent = `${info.intents} chủ đề · học xong trong ${Math.round(performance.now() - t0)} ms · chạy offline`;
@@ -61,7 +61,7 @@ function send(text) {
 
 document.getElementById('f').onsubmit = (e) => { e.preventDefault(); const q = document.getElementById('q'); send(q.value); q.value = ''; };
 const chips = document.getElementById('chips');
-['Xin chào', 'Tên tôi là Khoa', 'Bạn làm được gì?', 'Mấy giờ rồi?', '12 nhân 7', 'Kể chuyện cười', 'Mình buồn quá'].forEach((t) => {
+['Xin chào', 'Tên tôi là Khoa', 'Bạn làm được gì?', 'Mấy giờ rồi?', '2 mũ 10', 'Thủ đô Nhật Bản', 'Chơi đoán số', 'Đố vui', 'Mình buồn quá'].forEach((t) => {
   const b = document.createElement('button'); b.textContent = t; b.onclick = () => send(t); chips.append(b);
 });
 add(bot.ctx.name ? `Chào ${bot.ctx.name}, lại gặp nhau rồi!` : 'Xin chào! Mình là Mây. Bạn tên gì?', 'bot');
