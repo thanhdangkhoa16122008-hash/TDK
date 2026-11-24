@@ -113,7 +113,7 @@ class MainActivity : Activity() {
         web.post { web.evaluateJavascript("window.$fn && window.$fn($a)", null) }
     }
 
-    private fun toast(msg: String) = runOnUiThread { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
+    private fun toast(msg: String): Unit = runOnUiThread { Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() }
 
     private fun keepScreen(on: Boolean) = runOnUiThread {
         if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -320,7 +320,7 @@ class MainActivity : Activity() {
             return File(modelsDir, name).delete()
         }
         @JavascriptInterface fun load(name: String, maxTokens: Int) = llmThread.execute { loadModel(name, maxTokens) }
-        @JavascriptInterface fun generate(prompt: String, temperature: Float, topK: Int) = llmThread.execute { generate(prompt, temperature, topK) }
+        @JavascriptInterface fun toast(msg: String) { this@MainActivity.toast(msg) }
         @JavascriptInterface fun stop() { runCatching { session?.cancelGenerateResponseAsync() }; keepScreen(false) }
         @JavascriptInterface fun studio(id: String, base: String, api: String, data: String) = netPool.execute {
             keepScreen(true); try { studioCall(id, base, api, data) } finally { keepScreen(false) }
