@@ -11,3 +11,4 @@ protobuf
 ftfy
 imageio[ffmpeg]
 pillow
+pypdf

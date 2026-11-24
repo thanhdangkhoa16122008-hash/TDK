@@ -249,8 +249,9 @@ const nv = (s) => s.toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/
 function mediaIntent(t) {
   const n = nv(t).trim();
   if (/\b(o dau|the nao|lam sao|tai sao|cach|hoc|co nen|la gi)\b|\?\s*$/.test(n)) return null;
-  if (/\b(tao|lam|dung|quay|xuat)\b.{0,25}\b(video|clip)\b/.test(n.slice(0, 80))) return 'video';
-  if (/^(?:\W*(?:hay|ban|may|oi|giup|minh|toi|nho|cho|xin)\b\s*)*(?:ve|tao|lam|thiet ke)\b.{0,30}\b(anh|hinh|tranh|poster|logo|nhan vat|bia|wallpaper)\b|^(?:hay\s+)?ve\s+\S/.test(n.slice(0, 80))) return 'image';
+  if (/^\W*(minh|toi|em|to|tui)\b/.test(n) && !/\b(giup|hay|nho|thu|cho (minh|toi|em))\b/.test(n)) return null;
+  if (/\b(tao|lam|dung|quay|xuat)\s+(?:(?:giup|cho|minh|toi|em|ho|mot|1|cai|doan|thu|nhanh)\s+){0,4}(video|clip)\b/.test(n.slice(0, 80))) return 'video';
+  if (/^(?:\W*(?:hay|ban|may|oi|giup|minh|toi|nho|cho|xin)\b\s*)*(?:(?:ve|tao|lam|thiet ke)\b.{0,30}\b(anh|hinh|tranh|poster|logo|nhan vat|bia|wallpaper)\b|ve\s+\S)/.test(n.slice(0, 80))) return 'image';
   return null;
 }
 function family(name) {

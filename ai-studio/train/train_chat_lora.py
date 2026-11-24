@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from studio.config import SYSTEM_PROMPT, pick_chat_model  # noqa: E402
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--data", default="data/chat_vi.jsonl")
+ap.add_argument("--data", nargs="+", default=["data/chat_vi.jsonl"], help="một hoặc nhiều file .jsonl")
 ap.add_argument("--out", default="loras/chat-may")
 ap.add_argument("--model", default=None)
 ap.add_argument("--epochs", type=float, default=3)
@@ -70,7 +70,7 @@ def encode(prompt, target):
     return {"input_ids": ids, "attention_mask": [1] * len(ids), "labels": labels}
 
 
-rows = [json.loads(l) for l in Path(args.data).read_text(encoding="utf-8").splitlines() if l.strip()]
+rows = [json.loads(l) for d in args.data if Path(d).exists() for l in Path(d).read_text(encoding="utf-8").splitlines() if l.strip()]
 data = [encode(p, t) for r in rows for p, t in samples(r)]
 print(f"{len(rows)} hội thoại → {len(data)} mẫu học")
 

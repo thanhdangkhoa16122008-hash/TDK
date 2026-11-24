@@ -73,11 +73,14 @@ def normalize_vi(s: str) -> str:
     return "".join(c for c in s if unicodedata.category(c) != "Mn")
 
 
-_VIDEO_RE = re.compile(r"\b(tao|lam|dung|quay|render|xuat|ve)\b.{0,25}\b(video|clip|phim ngan|hoat hinh|chuyen dong)\b")
-_IMAGE_RE = re.compile(r"^(?:\W*(?:hay|ban|may|oi|giup|minh|toi|lam on|nho|cho|xin)\b\s*)*(?:ve|tao|lam|thiet ke|sang tac)\b.{0,30}\b(anh|hinh|tranh|poster|logo|nhan vat|bia|wallpaper|minh hoa)\b|^(?:hay\s+|giup minh\s+)?ve\s+\S")
+_VIDEO_RE = re.compile(r"\b(tao|lam|dung|quay|render|xuat)\s+(?:(?:giup|cho|minh|toi|tao|em|ho|mot|1|cai|doan|thu|nhanh)\s+){0,4}(video|clip|phim ngan|hoat hinh)\b")
+_IMAGE_RE = re.compile(r"^(?:\W*(?:hay|ban|may|oi|giup|minh|toi|lam on|nho|cho|xin)\b\s*)*(?:(?:ve|tao|lam|thiet ke|sang tac)\b.{0,30}\b(anh|hinh|tranh|poster|logo|nhan vat|bia|wallpaper|minh hoa)\b|ve\s+\S)")
 
 
 _QUESTION_RE = re.compile(r"\b(o dau|the nao|lam sao|tai sao|vi sao|cach nao|cach de|hoc|co nen|bao nhieu|la gi|phan mem|app nao|ung dung)\b|\?\s*$")
+
+_SELF_STATEMENT = re.compile(r"^\W*(minh|toi|em|to|tui)\b")  # không có "tao": trùng "tạo" khi bỏ dấu
+_ASK = re.compile(r"\b(giup|hay|nho|thu|cho (minh|toi|tao|em|to|tui)|muon (ban|may|may oi))\b")
 
 _SPECIAL = re.compile(r"<\|[^|>]+\|>")
 
@@ -102,6 +105,8 @@ def detect_media(msg: str):
     if n.startswith("/ve") or n.startswith("/anh"):
         return "image", raw.split(maxsplit=1)[1] if " " in raw else ""
     if _QUESTION_RE.search(n):  # "vẽ tranh thì học ở đâu?" là câu hỏi, không phải yêu cầu vẽ
+        return None
+    if _SELF_STATEMENT.match(n) and not _ASK.search(n):  # "mình làm video mỗi tuần" là kể chuyện, không phải nhờ làm
         return None
     if _VIDEO_RE.search(n[:80]):
         return "video", raw

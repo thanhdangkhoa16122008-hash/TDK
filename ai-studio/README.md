@@ -10,6 +10,20 @@ AI của riêng bạn: **trò chuyện · tạo ảnh · dựng video**, dùng m
 | Dựng video | Wan 2.1 1.3B · LTX-Video | 8 GB · 12 GB | Clip 2–5 giây; có **ảnh → video** |
 | Huấn luyện | QLoRA chat · LoRA ảnh SDXL | 16 GB (Colab T4 được) | Dạy giọng nói / phong cách / nhân vật riêng |
 
+## Mây của riêng bạn
+
+Bốn thứ làm Mây thành AI **của bạn**, không phải chatbot chung chung:
+
+1. **Bộ não bạn sở hữu:** mô hình mở Qwen3 chạy trên máy bạn; chọn 8B (nhanh) hoặc 14B (sáng tạo hơn) ở tab *🧠 Mây của bạn*.
+2. **Trí nhớ về bạn:** khi bạn kể về bản thân (tên, dự án, mục tiêu, sở thích) hoặc nói *“hãy nhớ rằng…”*, Mây tự ghi lại
+   và dùng trong mọi cuộc trò chuyện sau. Xem/sửa/xóa ở tab *🧠 Mây của bạn*.
+3. **Kiến thức riêng:** nạp ghi chú, kịch bản, kế hoạch (.txt .md .pdf .docx); Mây tra cứu và trả lời dựa trên tài liệu của bạn.
+4. **Tư duy sáng tạo:** chọn chế độ *💡 Sáng tạo*. Mây nghĩ 7 hướng khác nhau (có cả hướng táo bạo), tự phản biện như người
+   chấm khó tính, rồi kết hợp ý mạnh nhất thành câu trả lời. Chậm hơn khoảng 3 lần nhưng ý tưởng tốt hơn rõ.
+
+Thêm: **Mây học từ bạn.** Bấm 👍/👎 dưới câu trả lời; khi có khoảng 50+ 👍, chạy huấn luyện LoRA để Mây nói chuyện đúng kiểu bạn thích.
+Tất cả dữ liệu nằm trong `userdata/` (Colab: Google Drive), không gửi đi đâu.
+
 ## Chạy nhanh
 
 **Google Colab (miễn phí, khuyên dùng):** mở `Mây_AI_Studio_Colab.ipynb` trên Colab, chọn GPU T4, chạy lần lượt từng ô.

@@ -18,6 +18,17 @@ class DemoStudio:
 
     def chat_stream(self, messages, think=False, max_new_tokens=None):
         q = messages[-1]["content"]
+        if q.startswith("Đọc tin nhắn của người dùng"):  # giả lập trích trí nhớ
+            import json, re
+            m = re.search(r"Tin nhắn: «(.*)»", q, re.S)
+            yield "", json.dumps([f"Người dùng nói: {m.group(1)}"] if m else [], ensure_ascii=False)
+            return
+        sysmsg = messages[0]["content"] if messages and messages[0]["role"] == "system" else ""
+        if "Những điều bạn đã biết về người dùng" in sysmsg:
+            q += " [có trí nhớ]"
+        if "Trích từ tài liệu riêng" in sysmsg:
+            q += " [có tài liệu]"
+
         thought = f"Người dùng hỏi: “{q}”. Mình cần hiểu ý rồi trả lời ngắn gọn." if think else ""
         ans = f"(demo) Mình đã nhận: {q}. Có {len(messages) - 1} lượt trong ngữ cảnh."
         for i in range(1, len(thought) + 1, 12):
