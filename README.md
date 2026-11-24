@@ -32,16 +32,20 @@ html/
     anime.js             nhân vật nữ anime bằng code: tô bóng hoạt hình + viền, mắt to chớp, 5 biểu cảm, 4 kiểu tóc, 5 động tác
     lowpoly.js           model low-poly bằng code: cây, đá, nhà, hàng rào, cây trồng 4 giai đoạn, nhân vật
     sfx.js               12 hiệu ứng âm thanh + nhạc nền tự sinh (calm / happy / horror)
+    chatbot.js           AI giao tiếp tiếng Việt offline: tự học ý định (hiểu cả không dấu), nhớ tên, giờ/ngày, tính toán
+    chatbot-data.js      dữ liệu học của chatbot (27 chủ đề) — thêm chủ đề mới tại đây
   templates/           Game mẫu chạy được — copy ra để làm game mới
     adventure-3d-starter/  góc nhìn thứ 3: nhân vật Kenney có animation, địa hình, ngày/đêm, xu, lưu game
     horror-fps-starter/    kinh dị góc nhìn thứ nhất: biệt thự, đèn pin hết pin, cửa, chìa khóa, bóng ma, nỗi sợ
     basic-3d-starter/      bản tối giản, không dùng file model
     character-viewer/      xem nhân vật anime xoay 360°, đổi tóc/màu/biểu cảm/động tác
+    chatbot-starter/       khung chat với AI "Mây" (thêm ?debug để xem ý định + độ tin cậy)
   tools/
     build-single.mjs     đóng gói game thành MỘT file .html offline (nhúng cả model/âm thanh)
     test-game.mjs        chạy thử như điện thoại: bắt lỗi, đo FPS, giả lập điều khiển, chụp màn hình
     embed-glb.mjs        nhúng texture rời vào file .glb
     model-sheet.html     xem trước mọi model
+    test-chatbot.mjs     train + đo độ chính xác chatbot trên câu chưa thấy (--chat: chat trong terminal)
 godot/addons/          Copy vào res://addons/ rồi bật trong Project Settings → Plugins
     phantom_camera/ (4.4+)  dialogic/ (2.0-alpha-20, cần 4.5+)  beehave/ (AI)  virtual_joystick/  godot_sfxr/
 ```
