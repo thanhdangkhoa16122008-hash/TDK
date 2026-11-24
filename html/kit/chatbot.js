@@ -137,7 +137,7 @@ export function createChatbot({ intents, knowledge = [], botName = 'Mây', thres
     return best;
   }
 
-  const ctx = { name: null, bot: botName, last: null, prev: null, lastReply: '', expect: null, game: null, turns: 0, history: [] };
+  const ctx = { name: null, bot: botName, last: null, prev: null, lastReply: '', expect: null, game: null, turns: 0, history: [], dialog: [] };
   const lastPick = {};
   const pickR = (arr, key) => { // tránh lặp lại câu vừa nói
     if (arr.length === 1) return arr[0];
@@ -196,7 +196,7 @@ export function createChatbot({ intents, knowledge = [], botName = 'Mây', thres
     }
     const kb = kbVecs.length ? kbSearch(mseg) : { sim: 0 };
     const known = top.intent !== OOS && top.confidence >= threshold;
-    if (kb.entry?.taught && kb.sim >= kbLow - 0.1) return { text: kb.entry.a, intent: 'kien_thuc', confidence: kb.sim }; // điều người dùng dạy được ưu tiên
+    if (kb.entry?.taught && kb.sim >= kbLow - 0.1) return { text: kb.entry.a, intent: 'kien_thuc', confidence: kb.sim, taught: true }; // điều người dùng dạy được ưu tiên
     if (kb.sim >= kbHigh && (!known || top.confidence < 0.8)) return { text: kb.entry.a, intent: 'kien_thuc', confidence: kb.sim };
     if (known) {
       const it = intents[k]; const resp = pickR(it.responses, it.tag);
@@ -245,9 +245,13 @@ export function createChatbot({ intents, knowledge = [], botName = 'Mây', thres
       knowledge.push({ q: [question], a: answer, taught: true }); buildKB();
     },
 
+    // Ghi 1 lượt hội thoại do bên ngoài tạo (vd câu trả lời của LLM) để giữ ngữ cảnh.
+    remember(role, text) { ctx.dialog.push({ role, content: String(text) }); if (ctx.dialog.length > 24) ctx.dialog.shift(); if (role === 'assistant') { ctx.lastReply = text; ctx.history.push(text); } },
+
     reply(text) {
       ctx.turns++;
       const raw = String(text).trim();
+      if (raw) bot.remember('user', raw);
       if (!raw) return done([{ text: 'Bạn muốn nói gì với mình nào?', intent: 'empty', confidence: 1 }]);
       if (ctx.game) { const g = handleGame(raw); if (g) return done([{ text: g, intent: 'tro_choi', confidence: 1 }]); }
       const math = tryMath(raw);
@@ -269,8 +273,8 @@ export function createChatbot({ intents, knowledge = [], botName = 'Mây', thres
 
     async replyAsync(text) {
       const r0 = bot.reply(text);
-      if (r0.intent === 'khong_hieu' && bot.fallback) {
-        try { const t = await bot.fallback(text, ctx); if (t) return { ...r0, text: t, intent: 'fallback' }; } catch (e) { console.warn('[chatbot] fallback lỗi:', e.message); }
+      if (bot.fallback && needsThinking(text, r0)) {
+        try { const t = await bot.fallback(text, ctx, r0); if (t) { ctx.dialog.pop(); bot.remember('assistant', t); return { ...r0, text: t, intent: 'fallback' }; } } catch (e) { console.warn('[chatbot] fallback lỗi:', e.message); }
       }
       return r0;
     },
@@ -279,11 +283,25 @@ export function createChatbot({ intents, knowledge = [], botName = 'Mây', thres
   function done(parts) {
     const text = parts.map((p) => p.text).join(' ');
     ctx.lastReply = text; ctx.history.push(text); if (ctx.history.length > 20) ctx.history.shift();
+    ctx.dialog.push({ role: 'assistant', content: text }); if (ctx.dialog.length > 24) ctx.dialog.shift();
     const main = parts[parts.length - 1];
     return { text, intent: main.intent, confidence: main.confidence, parts };
   }
 
   return bot;
+}
+
+// Bộ phân luồng: câu nào mô hình nhỏ tự trả lời được, câu nào cần một mô hình lớn suy luận.
+//   true  → nên chuyển cho LLM (bot.fallback / Claude)   false → trả lời offline là đủ
+const LOCAL_ONLY = ['tinh_toan', 'tro_choi', 'gioi_thieu_ten', 'empty', 'cau_do', 'choi_doan_so', 'hoi_gio', 'hoi_ngay', 'lap_lai', 'hoi_ten_user'];
+const REASON = /\b(tai sao|vi sao|lam sao|lam the nao|nhu the nao|the nao (la|thi)|giai thich|so sanh|phan tich|khac nhau|giong nhau|y nghia|nguyen nhan|neu\b.*\bthi|gia su|chung minh|suy luan|viet (cho|giup|mot|1|bai|doan|thu|tho)|tom tat|dich (sang|cau|giup)|ke ve|ke cho|lap ke hoach|ke hoach|nen .* hay|uu (diem|nhuoc)|loi khuyen|tu van|huong dan (cach|minh|toi)|cach (de|nao|lam)|giai (bai|giup|phuong trinh)|vi du|tai sao lai|co nen)\b/;
+export function needsThinking(text, r) {
+  if (!r || LOCAL_ONLY.includes(r.intent) || r.parts?.some((p) => p.taught)) return false;
+  if (r.intent === 'khong_hieu') return true;
+  const n = normalize(text), w = n.split(/\s+/).filter(Boolean).length;
+  if (REASON.test(n)) return true;
+  if (r.intent === 'kien_thuc') return r.confidence < 0.55 && w > 6;
+  return w >= 14 && r.confidence < 0.7;
 }
 
 // "tên tôi là Khoa", "mình tên Lan", "gọi tôi là An", "tôi là Minh" → tên (giữ chữ hoa/dấu gốc)
