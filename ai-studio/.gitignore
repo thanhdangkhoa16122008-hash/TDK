@@ -1,0 +1,3 @@
+outputs/
+loras/*-ckpt/
+__pycache__/

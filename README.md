@@ -3,6 +3,10 @@
 Thư viện, tài nguyên, bộ kit và khung game mẫu cho game HTML (điện thoại màn ngang/PC) và Godot.
 Tất cả miễn phí, mã nguồn mở / CC0, dùng thương mại được. Quy trình làm game: xem [GAMEDEV.md](GAMEDEV.md).
 
+## Mây AI Studio
+
+AI riêng chạy trên GPU của bạn hoặc Colab miễn phí: trò chuyện (Qwen3), tạo ảnh (SDXL/FLUX), dựng video (Wan 2.1/LTX), kèm huấn luyện LoRA bằng dữ liệu riêng. Xem [ai-studio/README.md](ai-studio/README.md).
+
 ## Cấu trúc
 
 ```
