@@ -1,6 +1,6 @@
 # MiniGPT: GPT cỡ nhỏ viết từ đầu
 
-Một GPT **của riêng bạn**, viết từ con số 0 (khoảng 700 dòng Python + PyTorch). Cùng kiến trúc với GPT-2:
+Một GPT **của riêng bạn**, viết từ con số 0 (gần 1.000 dòng Python + PyTorch, kể cả chú thích). Cùng kiến trúc với GPT-2:
 bạn tự huấn luyện trên dữ liệu tiếng Việt, tự dạy nó trò chuyện, và sở hữu toàn bộ, từ bộ tách từ đến trọng số.
 
 ```
