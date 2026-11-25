@@ -7,6 +7,10 @@ Tất cả miễn phí, mã nguồn mở / CC0, dùng thương mại được. Q
 
 AI riêng chạy trên GPU của bạn hoặc Colab miễn phí: trò chuyện (Qwen3), tạo ảnh (SDXL/FLUX), dựng video (Wan 2.1/LTX), kèm huấn luyện LoRA bằng dữ liệu riêng. Xem [ai-studio/README.md](ai-studio/README.md).
 
+## MiniGPT
+
+GPT cỡ nhỏ viết từ đầu (bộ tách từ BPE, Transformer, huấn luyện, dạy trò chuyện) để tự huấn luyện trên tiếng Việt. Xem [mini-gpt/README.md](mini-gpt/README.md).
+
 ## Cấu trúc
 
 ```

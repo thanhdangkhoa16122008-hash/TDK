@@ -1,0 +1,4 @@
+torch>=2.1          # Colab có sẵn
+numpy
+datasets            # chỉ cần khi tải Wikipedia/Hugging Face (prepare.py --wiki / --hf-dataset)
+gradio>=5           # chỉ cần cho giao diện web (chat.py --web)
