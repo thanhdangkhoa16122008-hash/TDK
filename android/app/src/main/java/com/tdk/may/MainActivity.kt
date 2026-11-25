@@ -14,6 +14,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -21,7 +22,9 @@ import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -44,6 +47,7 @@ class MainActivity : Activity() {
     @Volatile private var cancelDl = false
     private var fileCb: ValueCallback<Array<Uri>>? = null
     private val modelsDir by lazy { File(getExternalFilesDir(null) ?: filesDir, "models").apply { mkdirs() } }
+    private val miniDir by lazy { File(getExternalFilesDir(null) ?: filesDir, "minigpt").apply { mkdirs() } }   // MiniGPT (.mgpt)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,6 +69,27 @@ class MainActivity : Activity() {
                     return true
                 }
                 return false
+            }
+
+            // Trang (file://) không được tự đọc file trên máy: phục vụ mô hình MiniGPT qua https://minigpt.local/…
+            override fun shouldInterceptRequest(view: WebView, req: WebResourceRequest): WebResourceResponse? {
+                if (req.url.host != "minigpt.local") return null
+                val headers = mapOf("Access-Control-Allow-Origin" to "*", "Cache-Control" to "no-store")
+                val seg = req.url.pathSegments
+                return try {
+                    val stream = when {
+                        seg.size == 1 && seg[0] == "demo.mgpt" -> assets.open("minigpt-demo.mgpt")
+                        seg.size == 2 && seg[0] == "files" -> {
+                            val f = File(miniDir, seg[1])
+                            if (f.canonicalFile.parentFile != miniDir.canonicalFile) throw SecurityException("đường dẫn không hợp lệ")
+                            FileInputStream(f)
+                        }
+                        else -> throw java.io.FileNotFoundException(req.url.path)
+                    }
+                    WebResourceResponse("application/octet-stream", null, 200, "OK", headers, stream)
+                } catch (e: Exception) {
+                    WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers, ByteArrayInputStream((e.message ?: "").toByteArray()))
+                }
             }
         }
         web.webChromeClient = object : WebChromeClient() {
@@ -88,10 +113,11 @@ class MainActivity : Activity() {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
             REQ_FILE -> { fileCb?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data)); fileCb = null }
-            REQ_IMPORT -> {
+            REQ_IMPORT, REQ_IMPORT_MINI -> {
                 val uri = data?.data
-                if (resultCode == RESULT_OK && uri != null) netPool.execute { importModel(uri) }
-                else js("onDl", JSONObject().put("error", "Đã hủy chọn file"))
+                val mini = requestCode == REQ_IMPORT_MINI
+                if (resultCode == RESULT_OK && uri != null) netPool.execute { importModel(uri, mini) }
+                else js("onDl", JSONObject().put("error", "Đã hủy chọn file").put("kind", if (mini) "mgpt" else "task"))
             }
         }
     }
@@ -129,25 +155,29 @@ class MainActivity : Activity() {
     }
 
     // ---------- mô hình trên máy ----------
-    private fun modelList(): JSONArray {
+    private fun modelList(mini: Boolean = false): JSONArray {
         val arr = JSONArray()
-        modelsDir.listFiles()?.filter { it.name.endsWith(".task") }?.sortedBy { it.name }?.forEach {
+        val (dir, ext) = if (mini) miniDir to ".mgpt" else modelsDir to ".task"
+        dir.listFiles()?.filter { it.name.endsWith(ext) }?.sortedBy { it.name }?.forEach {
             arr.put(JSONObject().put("name", it.name).put("size", it.length()))
         }
         return arr
     }
 
-    private fun downloadModel(repo: String, file: String, token: String) {
+    private fun downloadModel(repo: String, file: String, token: String) =
+        downloadTo("https://huggingface.co/$repo/resolve/main/$file?download=true", File(modelsDir, file.substringAfterLast('/')), token, false)
+
+    /** Tải một file về (tải tiếp được khi bị ngắt), báo tiến độ qua window.onDl({kind, pct…}). */
+    private fun downloadTo(url: String, out: File, token: String, mini: Boolean) {
         cancelDl = false
         keepScreen(true)
-        val out = File(modelsDir, file.substringAfterLast('/'))
+        val kind = if (mini) "mgpt" else "task"
         val part = File(out.path + ".part")
         try {
-            val url = "https://huggingface.co/$repo/resolve/main/$file?download=true"
             val c = open(url, token)
             if (part.exists()) c.setRequestProperty("Range", "bytes=${part.length()}-")   // tải tiếp khi bị ngắt
             val code = c.responseCode
-            if (code == 401 || code == 403) throw Exception("Mô hình yêu cầu đăng nhập/đồng ý giấy phép trên Hugging Face (HTTP $code). Nhập token HF trong Cài đặt.")
+            if (code == 401 || code == 403) throw Exception("Máy chủ từ chối (HTTP $code). Mô hình Hugging Face có thể cần token trong Cài đặt.")
             if (code >= 400) throw Exception("HTTP $code")
             val append = code == 206
             val start = if (append) part.length() else 0L
@@ -161,28 +191,39 @@ class MainActivity : Activity() {
                         val n = inp.read(buf); if (n < 0) break
                         o.write(buf, 0, n); done += n
                         val pct = if (total > 0) (done * 100 / total).toInt() else -1
-                        if (pct != lastPct) { lastPct = pct; js("onDl", JSONObject().put("pct", pct).put("done", done).put("total", total).put("name", out.name)) }
+                        if (pct != lastPct) { lastPct = pct; js("onDl", JSONObject().put("kind", kind).put("pct", pct).put("done", done).put("total", total).put("name", out.name)) }
                     }
                 }
             }
-            part.renameTo(out)
-            js("onDl", JSONObject().put("finished", true).put("name", out.name).put("models", modelList()))
+            if (mini) checkMgpt(part)
+            out.delete(); part.renameTo(out)
+            js("onDl", JSONObject().put("kind", kind).put("finished", true).put("name", out.name).put("models", modelList(mini)))
         } catch (e: Exception) {
-            js("onDl", JSONObject().put("error", e.message ?: e.toString()))
+            if (mini && e.message?.startsWith("File tải về") == true) part.delete()
+            js("onDl", JSONObject().put("kind", kind).put("error", e.message ?: e.toString()))
         } finally { keepScreen(false) }
     }
 
-    private fun importModel(uri: Uri) {
+    private fun checkMgpt(f: File) {
+        val magic = ByteArray(4)
+        FileInputStream(f).use { it.read(magic) }
+        if (String(magic) != "MGPT") throw Exception("File tải về không phải mô hình MiniGPT (.mgpt). Kiểm tra lại link (cần link tải trực tiếp).")
+    }
+
+    private fun importModel(uri: Uri, mini: Boolean) {
+        val kind = if (mini) "mgpt" else "task"
         try {
-            var name = "model.task"; var size = -1L
+            var name = if (mini) "model.mgpt" else "model.task"; var size = -1L
             contentResolver.query(uri, null, null, null, null)?.use { cur ->
                 if (cur.moveToFirst()) {
                     cur.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }?.let { name = cur.getString(it) }
                     cur.getColumnIndex(OpenableColumns.SIZE).takeIf { it >= 0 }?.let { size = cur.getLong(it) }
                 }
             }
-            if (!name.endsWith(".task")) throw Exception("Cần file mô hình đuôi .task (MediaPipe)")
-            val out = File(modelsDir, name)
+            if (mini && !name.endsWith(".mgpt")) throw Exception("Cần file MiniGPT đuôi .mgpt (tạo bằng export_mobile.py)")
+            if (!mini && !name.endsWith(".task")) throw Exception("Cần file mô hình đuôi .task (MediaPipe)")
+            name = name.replace(Regex("[^\\p{L}\\p{N}._ -]"), "_")
+            val out = File(if (mini) miniDir else modelsDir, name)
             var done = 0L; var lastPct = -1
             contentResolver.openInputStream(uri)!!.use { inp ->
                 FileOutputStream(out).use { o ->
@@ -191,13 +232,14 @@ class MainActivity : Activity() {
                         val n = inp.read(buf); if (n < 0) break
                         o.write(buf, 0, n); done += n
                         val pct = if (size > 0) (done * 100 / size).toInt() else -1
-                        if (pct != lastPct) { lastPct = pct; js("onDl", JSONObject().put("pct", pct).put("done", done).put("total", size).put("name", name)) }
+                        if (pct != lastPct) { lastPct = pct; js("onDl", JSONObject().put("kind", kind).put("pct", pct).put("done", done).put("total", size).put("name", name)) }
                     }
                 }
             }
-            js("onDl", JSONObject().put("finished", true).put("name", name).put("models", modelList()))
+            if (mini) try { checkMgpt(out) } catch (e: Exception) { out.delete(); throw Exception("File này không phải mô hình MiniGPT (.mgpt).") }
+            js("onDl", JSONObject().put("kind", kind).put("finished", true).put("name", name).put("models", modelList(mini)))
         } catch (e: Exception) {
-            js("onDl", JSONObject().put("error", e.message ?: e.toString()))
+            js("onDl", JSONObject().put("kind", kind).put("error", e.message ?: e.toString()))
         }
     }
 
@@ -315,6 +357,21 @@ class MainActivity : Activity() {
             val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
             @Suppress("DEPRECATION") startActivityForResult(i, REQ_IMPORT)
         }
+        // ---- MiniGPT (.mgpt): file nằm trong miniDir, trang đọc qua https://minigpt.local/files/<tên> ----
+        @JavascriptInterface fun miniList(): String = modelList(true).toString()
+        @JavascriptInterface fun importMini() = runOnUiThread {
+            val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+            @Suppress("DEPRECATION") startActivityForResult(i, REQ_IMPORT_MINI)
+        }
+        @JavascriptInterface fun downloadMini(url: String) = netPool.execute {
+            var name = Uri.parse(url).lastPathSegment?.substringAfterLast('/')?.replace(Regex("[^\\p{L}\\p{N}._ -]"), "_") ?: "minigpt.mgpt"
+            if (!name.endsWith(".mgpt")) name = name.substringBeforeLast('.').ifBlank { "minigpt" } + ".mgpt"
+            downloadTo(url, File(miniDir, name), "", true)
+        }
+        @JavascriptInterface fun deleteMini(name: String): Boolean {
+            val f = File(miniDir, name)
+            return f.canonicalFile.parentFile == miniDir.canonicalFile && f.delete()
+        }
         @JavascriptInterface fun deleteModel(name: String): Boolean {
             if (name == loaded) llmThread.execute { runCatching { session?.close(); llm?.close() }; llm = null; session = null; loaded = null }
             return File(modelsDir, name).delete()
@@ -337,5 +394,5 @@ class MainActivity : Activity() {
         @JavascriptInterface fun toast(msg: String) { this@MainActivity.toast(msg) }
     }
 
-    companion object { const val REQ_FILE = 1; const val REQ_IMPORT = 2 }
+    companion object { const val REQ_FILE = 1; const val REQ_IMPORT = 2; const val REQ_IMPORT_MINI = 3 }
 }

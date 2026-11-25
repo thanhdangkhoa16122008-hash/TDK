@@ -90,7 +90,17 @@ label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4
       <div class="hr"><button class="s" id="s-test">Kiểm tra kết nối</button><span id="s-res" class="note"></span></div>
       <div class="note">Link gradio.live đổi mỗi lần chạy lại Colab, nhớ dán link mới.</div>
     </div>
-    <div class="card"><h2>📱 Mô hình chat trên máy</h2>
+    <div class="card"><h2>🧠 MiniGPT của bạn</h2>
+      <div class="note">GPT bạn tự huấn luyện (thư mục <b>mini-gpt</b>), chạy hoàn toàn trên điện thoại bằng JavaScript, không cần mạng.
+        Huấn luyện trên Colab → ô “Xuất cho điện thoại” → chép file <b>.mgpt</b> vào máy → bấm “Nạp file”.</div>
+      <div id="g-list"></div>
+      <div id="g-dl" style="display:none"><div class="mrow"><span id="g-dlname"></span><button class="s" id="g-dlstop">Dừng</button></div><div class="bar"><i id="g-dlbar"></i></div><div class="note" id="g-dltxt"></div></div>
+      <div class="hr"><button class="s" id="g-import">📂 Nạp file .mgpt</button><button class="s" id="g-usemini">⚡ Dùng lại Mây mini</button></div>
+      <label>Hoặc tải từ link trực tiếp (vd file đính kèm trên GitHub)<input id="g-url" inputmode="url" placeholder="https://…/may.mgpt"></label>
+      <button class="s" id="g-urlgo">Tải về</button>
+      <div class="note" id="g-status"></div>
+    </div>
+    <div class="card"><h2>📱 Mô hình chat trên máy (Qwen, MediaPipe)</h2>
       <div id="s-ram" class="note"></div>
       <div id="s-models"></div>
       <div id="s-dl" style="display:none"><div class="mrow"><span id="s-dlname"></span><button class="s" id="s-dlstop">Dừng</button></div><div class="bar"><i id="s-dlbar"></i></div><div class="note" id="s-dltxt"></div></div>
@@ -112,6 +122,7 @@ label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4
 <nav><button class="on" data-p="chat"><b>💬</b>Trò chuyện</button><button data-p="img"><b>🎨</b>Ảnh</button><button data-p="vid"><b>🎬</b>Video</button><button data-p="set"><b>⚙️</b>Cài đặt</button></nav>
 
 <script src="may-mini.js"></script>
+<script src="minigpt.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const N = window.Native || null;   // null khi mở trong trình duyệt để thử giao diện
@@ -163,10 +174,15 @@ $('s-test').onclick = async () => { $('s-res').textContent = 'Đang kiểm tra�
 let info = { models: [], loaded: null };
 const refreshInfo = () => { if (N) try { info = JSON.parse(N.info()); } catch {} updateStatus(); };
 function updateStatus() {
-  $('status').textContent = info.loaded ? `📱 ${info.loaded.replace(/\.task$/, '')} · ${info.backend}` : (mini ? 'Mây mini (offline) · tải mô hình ở Cài đặt để thông minh hơn' : 'chưa có mô hình');
+  const b = store.get('brain', '');
+  if (b === 'minigpt' && MG.ready) $('status').textContent = `🧠 MiniGPT ${MG.label} · chạy trên máy`;
+  else if (b === 'minigpt' && MG.loading) $('status').textContent = 'Đang nạp MiniGPT…';
+  else if (b !== 'mini' && b !== 'minigpt' && info.loaded) $('status').textContent = `📱 ${info.loaded.replace(/\.task$/, '')} · ${info.backend}`;
+  else $('status').textContent = mini ? 'Mây mini (offline) · nạp MiniGPT hoặc Qwen ở Cài đặt để thông minh hơn' : 'chưa có mô hình';
 }
 function renderModels() {
   refreshInfo();
+  renderMini();
   $('s-ram').textContent = info.ramGB ? `RAM máy: ${info.ramGB.toFixed(1)} GB · bộ nhớ trống: ${gb(info.freeBytes || 0)}` : 'Mở trong app Android để quản lý mô hình.';
   $('s-models').innerHTML = (info.models || []).length ? '' : '<div class="note">Chưa có mô hình nào. Tải một mô hình bên dưới (khoảng 1–2 GB, nên dùng Wi-Fi).</div>';
   for (const m of info.models || []) {
@@ -209,6 +225,7 @@ $('s-repolist').onclick = () => { const r = $('s-repo').value.trim(); if (r) { s
 $('s-import').onclick = () => { if (N) { $('s-dl').style.display = ''; $('s-dlname').textContent = 'Nhập file…'; N.importModel(); } };
 $('s-dlstop').onclick = () => N && N.cancelDownload();
 window.onDl = (d) => {
+  if (d.kind === 'mgpt') return onMiniDl(d);
   if (d.error) { $('s-dltxt').innerHTML = `<span class="bad">${esc(d.error)}</span>`; return; }
   if (d.finished) {
     $('s-dltxt').innerHTML = '<span class="ok">✓ Xong!</span>'; $('s-dlbar').style.width = '100%';
@@ -224,10 +241,131 @@ function loadModel(name) {
 }
 window.onModel = (r) => {
   refreshInfo();
-  if (r.ok) { store.set('model', r.name); sysMsg(`Đã nạp mô hình ${r.name} (${r.backend}). Mây giờ chạy bằng AI thật trên máy bạn.`); }
+  if (r.ok) { store.set('model', r.name); store.set('brain', 'task'); sysMsg(`Đã nạp mô hình ${r.name} (${r.backend}). Mây giờ chạy bằng AI thật trên máy bạn.`); }
   else sysMsg('Không nạp được mô hình: ' + r.error + '\nThử chọn đúng “Độ dài ngữ cảnh” trong Cài đặt → Nâng cao, hoặc mô hình khác.');
   if (page === 'set') renderModels();
 };
+
+// ---------- MiniGPT: GPT tự huấn luyện, chạy bằng JavaScript (mobile/minigpt.js) ----------
+const MG = { worker: null, ready: false, loading: false, name: null, label: '', info: null, wait: null, onMsg: null, generating: false, inline: false };
+function mgInline() {                       // dự phòng khi WebView không cho tạo Web Worker: chạy ngay trên trang
+  const w = { onmessage: null, terminate() {} };
+  const inner = { postMessage: (d) => w.onmessage && w.onmessage({ data: d }) };
+  miniGPTWorker(inner);
+  w.postMessage = (d) => setTimeout(() => inner.onmessage({ data: d }), 0);
+  return w;
+}
+function mgSpawn(inline) {
+  if (MG.worker) MG.worker.terminate();
+  let w = null;
+  if (!inline) {
+    try {
+      const src = MiniGPTLib.toString() + '\n(' + miniGPTWorker.toString() + ')(self);';
+      w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    } catch (e) { w = null; }
+  }
+  MG.inline = !w;
+  w = w || mgInline();
+  w.onmessage = (e) => {
+    const d = e.data;
+    if (d.type === 'loaded') MG.wait && MG.wait.ok(d.info);
+    else if (d.type === 'error' && !d.id) MG.wait && MG.wait.fail(new Error(d.error));
+    else MG.onMsg && MG.onMsg(d);
+  };
+  w.onerror = (ev) => { ev.preventDefault && ev.preventDefault(); MG.wait && MG.wait.fail(new Error('worker')); };
+  MG.worker = w;
+}
+const mgUrl = (name) => name === 'demo' ? 'https://minigpt.local/demo.mgpt' : 'https://minigpt.local/files/' + encodeURIComponent(name);
+async function mgFetch(name) {
+  const r = await fetch(mgUrl(name));
+  if (!r.ok) throw new Error('Không đọc được file mô hình (' + r.status + ')');
+  return r.arrayBuffer();
+}
+function mgLoadInto(buf) {
+  return new Promise((ok, fail) => { MG.wait = { ok, fail }; MG.worker.postMessage({ type: 'load', buf }, MG.inline ? undefined : [buf]); });
+}
+async function mgLoad(name) {
+  MG.ready = false; MG.loading = true; MG.name = name;
+  MG.label = name === 'demo' ? 'thử' : name.replace(/\.mgpt$/, '');
+  updateStatus();
+  $('g-status').textContent = 'Đang nạp…';
+  const t0 = Date.now();
+  try {
+    mgSpawn(false);
+    try { MG.info = await mgLoadInto(await mgFetch(name)); }
+    catch (e) {                               // Web Worker hỏng → chạy trên trang
+      if (MG.inline) throw e;
+      mgSpawn(true);
+      MG.info = await mgLoadInto(await mgFetch(name));
+    }
+    MG.ready = true;
+    store.set('brain', 'minigpt'); store.set('mgpt', name);
+    const i = MG.info;
+    $('g-status').innerHTML = `<span class="ok">✓ Đang dùng ${esc(MG.label)}</span> · ${(i.params / 1e6).toFixed(1)}M tham số · ${i.n_layer} lớp · ngữ cảnh ${i.block_size} · ${i.quant} · ${i.kind === 'chat' ? 'bản trò chuyện' : 'bản viết tiếp'} · nạp ${((Date.now() - t0) / 1000).toFixed(1)}s${MG.inline ? ' (chạy trên trang)' : ''}`;
+    sysMsg(`Đã nạp MiniGPT ${MG.label} (${(i.params / 1e6).toFixed(1)}M tham số). Từ giờ mình trả lời bằng GPT bạn tự huấn luyện, chạy ngay trên điện thoại.` + (i.kind === 'chat' ? '' : ' Đây là bản chưa dạy trò chuyện nên mình sẽ viết tiếp câu bạn gõ.'));
+  } catch (e) {
+    MG.ready = false;
+    $('g-status').innerHTML = `<span class="bad">Không nạp được: ${esc(e.message)}</span>`;
+  }
+  MG.loading = false;
+  updateStatus(); renderMini();
+}
+function renderMini() {
+  const list = $('g-list'); list.innerHTML = '';
+  let files = [];
+  if (N && N.miniList) try { files = JSON.parse(N.miniList()); } catch {}
+  const items = [{ name: 'demo', label: 'MiniGPT thử (có sẵn, 1,1M tham số, học từ dữ liệu Mây)', size: 0, builtin: true }]
+    .concat(files.map((f) => ({ name: f.name, label: f.name, size: f.size })));
+  const cur = store.get('brain') === 'minigpt' && MG.ready ? MG.name : null;
+  for (const it of items) {
+    const d = document.createElement('div'); d.className = 'mrow';
+    d.innerHTML = `<span>${it.name === cur ? '✅ ' : ''}${esc(it.label)} ${it.size ? `<span class="note">${gb(it.size)}</span>` : ''}</span>`;
+    const b = document.createElement('button'); b.className = 's'; b.textContent = it.name === cur ? 'Đang dùng' : 'Dùng'; b.disabled = it.name === cur || MG.loading;
+    b.onclick = () => mgLoad(it.name);
+    d.append(b);
+    if (!it.builtin) {
+      const x = document.createElement('button'); x.className = 's'; x.textContent = 'Xóa';
+      x.onclick = () => { if (x.dataset.c) { N.deleteMini(it.name); if (store.get('mgpt') === it.name) store.set('mgpt', ''); renderMini(); } else { x.dataset.c = 1; x.textContent = 'Chắc chưa?'; } };
+      d.append(x);
+    }
+    list.append(d);
+  }
+}
+$('g-import').onclick = () => { if (N && N.importMini) { $('g-dl').style.display = ''; $('g-dlname').textContent = 'Nhập file…'; $('g-dltxt').textContent = ''; N.importMini(); } };
+$('g-urlgo').onclick = () => {
+  const u = $('g-url').value.trim();
+  if (!/^https?:\/\//.test(u)) { $('g-status').textContent = 'Hãy dán link bắt đầu bằng https://'; return; }
+  if (N && N.downloadMini) { $('g-dl').style.display = ''; $('g-dlname').textContent = u.split('/').pop(); $('g-dltxt').textContent = 'Bắt đầu…'; N.downloadMini(u); }
+};
+$('g-dlstop').onclick = () => N && N.cancelDownload();
+$('g-usemini').onclick = () => { store.set('brain', 'mini'); updateStatus(); renderMini(); sysMsg('Đã chuyển về Mây mini.'); };
+function onMiniDl(d) {
+  if (d.error) { $('g-dltxt').innerHTML = `<span class="bad">${esc(d.error)}</span>`; return; }
+  if (d.finished) { $('g-dltxt').innerHTML = '<span class="ok">✓ Xong!</span>'; $('g-dlbar').style.width = '100%'; renderMini(); mgLoad(d.name); return; }
+  $('g-dlbar').style.width = (d.pct >= 0 ? d.pct : 0) + '%';
+  $('g-dltxt').textContent = `${d.pct >= 0 ? d.pct + '% · ' : ''}${gb(d.done)}${d.total ? ' / ' + gb(d.total) : ''}`;
+}
+function mgReply(row, m) {
+  return new Promise((resolve) => {
+    const id = 'g' + (++seq);
+    const chat = MG.info.kind === 'chat';
+    MG.generating = true; $('send').textContent = '■'; $('send').disabled = false;
+    MG.onMsg = (d) => {
+      if (d.id !== id) return;
+      if (d.type === 'token') { m.textContent = d.text.trim() || '…'; $('log').scrollTop = $('log').scrollHeight; return; }
+      MG.generating = false; $('send').textContent = 'Gửi';
+      if (d.type === 'done') {
+        const t = d.text.trim();
+        if (!t) m.textContent = '(MiniGPT không trả lời được câu này)';
+        meta(row, `🧠 MiniGPT ${MG.label} · ${d.stats.tokens} token · ${d.stats.tps.toFixed(1)} token/s · chờ ${(d.stats.firstMs / 1000).toFixed(1)}s${d.stats.stopped ? ' · đã dừng' : ''}`);
+        resolve(t || null);
+      } else { m.textContent = '⚠️ ' + d.error; resolve(null); }
+    };
+    const opts = { temperature: parseFloat(store.get('temp', '0.7')), top_k: 40, top_p: 0.9, repetition_penalty: 1.15, max_new_tokens: chat ? 200 : 120 };
+    if (chat) MG.worker.postMessage({ type: 'chat', id, messages: turns.slice(-12), opts });
+    else MG.worker.postMessage({ type: 'complete', id, text: turns[turns.length - 1].content, opts });
+  });
+}
 
 // ---------- Mây mini (luôn có, không cần tải) ----------
 let mini = null;
@@ -310,7 +448,8 @@ async function makeMedia(kind, text, row, m) {
   }
 }
 async function send() {
-  const text = $('q').value.trim(); if (!text || busy) return;
+  if (busy) { if (MG.generating && MG.worker) MG.worker.postMessage({ type: 'stop' }); return; }
+  const text = $('q').value.trim(); if (!text) return;
   $('q').value = ''; autoGrow(); busy = true; $('send').disabled = true;
   bubble('me', text); turns.push({ role: 'user', content: text });
   const { row, m } = bubble('bot', '…');
@@ -325,14 +464,17 @@ async function send() {
       m.textContent = '☁️ Đang hỏi máy chủ…';
       const [out] = await studio('chat_api', [text, JSON.stringify(turns.slice(0, -1).slice(-20)), false]);
       ans = out; m.textContent = out; meta(row, '☁️ Máy chủ');
-    } else if (info.loaded && N) {
+    } else if (store.get('brain') === 'minigpt' && (MG.ready || MG.loading)) {
+      if (!MG.ready) throw new Error('MiniGPT đang nạp, đợi vài giây rồi gửi lại.');
+      ans = await mgReply(row, m);
+    } else if (store.get('brain') !== 'mini' && info.loaded && N) {
       ans = await localLLM(row, m);
     } else if (mini) {
       const r = mini.reply(text); ans = r.text; m.textContent = ans; meta(row, '⚡ Mây mini');
     } else ans = m.textContent = 'Chưa có mô hình. Vào Cài đặt để tải.';
     if (ans) turns.push({ role: 'assistant', content: ans });
   } catch (e) { m.textContent = '⚠️ ' + e.message; turns.pop(); }
-  busy = false; $('send').disabled = false;
+  busy = false; $('send').disabled = false; $('send').textContent = 'Gửi';
 }
 $('send').onclick = send;
 $('q').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
@@ -384,9 +526,12 @@ $('v-go').onclick = async () => {
 // ---------- khởi động ----------
 refreshInfo();
 const last = store.get('model', '');
-if (N && !info.loaded && last && (info.models || []).some((m) => m.name === last)) loadModel(last);
-sysMsg(N ? (info.models?.length ? 'Chào bạn! Mình là Mây.' : 'Chào bạn! Mình là Mây. Hiện mình đang dùng bản mini offline. Vào ⚙️ Cài đặt → tải mô hình Qwen2.5 1.5B (~1.6 GB) để mình thông minh hơn hẳn, chạy ngay trên máy, không cần mạng.')
-  : 'Đang mở trong trình duyệt: chỉ có Mây mini để thử giao diện.');
+if (N && !info.loaded && last && store.get('brain') !== 'minigpt' && store.get('brain') !== 'mini' && (info.models || []).some((m) => m.name === last)) loadModel(last);
+if (store.get('brain') === 'minigpt' && store.get('mgpt')) mgLoad(store.get('mgpt'));
+sysMsg(!N ? 'Đang mở trong trình duyệt: chỉ có Mây mini để thử giao diện.'
+  : store.get('brain') === 'minigpt' ? 'Chào bạn! Mình là Mây, đang chạy bằng MiniGPT của bạn.'
+  : (info.models?.length || store.get('brain') === 'mini') ? 'Chào bạn! Mình là Mây.'
+  : 'Chào bạn! Mình là Mây (bản mini offline). Vào ⚙️ Cài đặt để chọn bộ não chạy ngay trên máy: 🧠 MiniGPT (GPT bạn tự huấn luyện, có sẵn bản thử) hoặc Qwen 1.5B (~1,6 GB, thông minh hơn).');
 updateStatus();
 </script>
 </body>

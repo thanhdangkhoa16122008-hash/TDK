@@ -21,6 +21,7 @@ văn bản ──► [1] prepare.py  học bộ tách từ BPE, mã hóa dữ li
 | `sft.py` | Dạy hội thoại (SFT), bước biến GPT thành "ChatGPT" |
 | `data/sft_vi.jsonl` | 1.139 hội thoại tiếng Việt (từ dữ liệu Mây + hội thoại viết tay). Tạo lại: `node tools/make_sft_data.mjs` |
 | `tests/test_minigpt.py` | Kiểm tra: tách từ đúng, bộ nhớ đệm KV khớp tính toàn bộ, học thuộc được, che nhãn SFT đúng |
+| `export_mobile.py`, `mobile/minigpt.js` | Xuất sang file `.mgpt` (8-bit) và bộ chạy JavaScript cho điện thoại/trình duyệt |
 
 ## Chạy
 
@@ -37,6 +38,22 @@ python sft.py --base out --out out-chat --epochs 3 --lr 5e-4
 python chat.py --ckpt out-chat
 ```
 (Dữ liệu ít như vậy thì mô hình chỉ học thuộc; đây là để thấy cả quy trình chạy.)
+
+## Chạy trên điện thoại
+
+MiniGPT chạy **ngay trên điện thoại, không cần mạng**, trong app Mây AI (thư mục `android/`):
+
+```bash
+python export_mobile.py --ckpt out-chat --out may.mgpt      # nén 8-bit: mô hình small ~35 MB
+```
+Chép `may.mgpt` vào điện thoại → app Mây AI → ⚙️ Cài đặt → **🧠 MiniGPT của bạn** → **📂 Nạp file .mgpt**.
+App có sẵn một bản thử nhỏ (1,1M tham số) để dùng ngay.
+
+- `mobile/minigpt.js`: bộ chạy bằng JavaScript thuần (bộ tách từ BPE, Transformer có bộ nhớ đệm KV, lấy mẫu), chạy trong
+  Web Worker; giữ bộ nhớ đệm giữa các lượt chat nên mỗi lượt chỉ tính phần tin nhắn mới.
+- `tests/test_mobile.py`: so bản JS với PyTorch. fp32 lệch tối đa ~4e-6 và sinh trùng từng token; int8 lệch ~0,5%,
+  token khả năng cao nhất trùng 100%; tách từ trùng cả với khoảng trắng/chữ số/emoji lạ.
+- Tốc độ đo trên CPU máy chủ (1 luồng): `mini` ~28 token/s, `small` ~14 token/s. Điện thoại mạnh dự kiến chậm hơn 1,5–2 lần.
 
 ## Cỡ mô hình
 

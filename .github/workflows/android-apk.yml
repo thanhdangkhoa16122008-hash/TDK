@@ -2,7 +2,7 @@
 name: Android APK
 on:
   push:
-    paths: ['android/**', 'html/kit/chatbot.js', 'html/kit/chatbot-data.js', '.github/workflows/android-apk.yml']
+    paths: ['android/**', 'html/kit/chatbot.js', 'html/kit/chatbot-data.js', 'mini-gpt/mobile/**', '.github/workflows/android-apk.yml']
   workflow_dispatch:
 permissions:
   contents: write
