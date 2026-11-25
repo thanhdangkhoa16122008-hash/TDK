@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mây AI</title>
+<style>
+:root{--bg:#f1f2f8;--card:#fff;--bubble:#fff;--fg:#1c2030;--muted:#6d7388;--line:#dde0ec;--acc:#5b4bd8;--accfg:#fff;--ok:#1f8a4c;--bad:#c0392b;--think:#8a4fd6}
+@media (prefers-color-scheme:dark){:root{--bg:#121319;--card:#1b1d27;--bubble:#232634;--fg:#e8e9f0;--muted:#8d92a6;--line:#2c3040;--acc:#7a6cf0;--ok:#4cc07e;--bad:#ee6b5d;--think:#b48af0;color-scheme:dark}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px 8px}
+.av{width:36px;height:36px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-weight:700}
+h1{font-size:17px;margin:0}.sub{font-size:12px;color:var(--muted)}
+main{flex:1;min-height:0;display:flex;flex-direction:column}
+.page{flex:1;min-height:0;display:none;flex-direction:column}
+.page.on{display:flex}
+.scroll{flex:1;overflow-y:auto;padding:8px 16px 16px;display:flex;flex-direction:column;gap:10px}
+nav{display:flex;border-top:1px solid var(--line);background:var(--card)}
+nav button{flex:1;border:0;background:none;color:var(--muted);padding:9px 0 11px;font:600 12px system-ui;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button b{font-size:19px;font-weight:400}
+nav button.on{color:var(--acc)}
+.row{display:flex;flex-direction:column;gap:3px;max-width:86%}
+.row.me{align-self:flex-end;align-items:flex-end}
+.msg{padding:9px 13px;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere}
+.bot .msg{background:var(--bubble);border-bottom-left-radius:4px;box-shadow:0 1px 2px #0000000f}
+.me .msg{background:var(--acc);color:var(--accfg);border-bottom-right-radius:4px}
+.meta{font-size:11px;color:var(--muted)}
+details.th{font-size:13px;color:var(--muted);border-left:3px solid var(--think);padding:2px 8px;white-space:pre-wrap}
+details.th summary{color:var(--think);cursor:pointer}
+.composer{display:flex;gap:8px;padding:8px 12px 10px;background:var(--bg)}
+textarea,input,select{font:15px system-ui;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;width:100%;min-width:0}
+textarea{resize:none}
+.composer textarea{border-radius:22px;max-height:120px}
+button.p{border:0;border-radius:14px;padding:10px 16px;background:var(--acc);color:#fff;font:600 15px system-ui}
+button.s{border:1px solid var(--line);border-radius:12px;padding:7px 12px;background:var(--card);color:var(--fg);font:14px system-ui}
+button:disabled{opacity:.5}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.card h2{font-size:15px;margin:0}
+label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.hr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hr>*{flex:1}
+.chip{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid currentColor}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}.bar i{display:block;height:100%;background:var(--acc);width:0}
+.res img,.res video{width:100%;border-radius:12px;background:#0002}
+.note{font-size:12px;color:var(--muted)}
+.mrow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
+.mrow span{overflow-wrap:anywhere}
+.mode{display:flex;gap:6px;padding:0 16px 6px}
+.mode button{flex:1;border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:10px;padding:6px;font:13px system-ui}
+.mode button.on{border-color:var(--acc);color:var(--acc);font-weight:600}
+</style>
+</head>
+<body>
+<header><div class="av">M</div><div><h1>Mây AI</h1><div class="sub" id="status">đang khởi động…</div></div></header>
+<main>
+  <!-- CHAT -->
+  <section class="page on" id="p-chat">
+    <div class="mode"><button id="m-local" class="on">📱 Trên máy (offline)</button><button id="m-server">☁️ Máy chủ (mạnh)</button></div>
+    <div class="scroll" id="log"></div>
+    <div class="composer"><textarea id="q" rows="1" placeholder="Nhắn cho Mây… (nói “vẽ…” hoặc “làm video…” để tạo)"></textarea><button class="p" id="send">Gửi</button></div>
+  </section>
+  <!-- ẢNH -->
+  <section class="page" id="p-img"><div class="scroll">
+    <div class="card"><h2>🎨 Tạo ảnh</h2>
+      <label>Mô tả (tiếng Việt)<textarea id="i-desc" rows="3" placeholder="Ngôi làng cổ lúc nửa đêm, bóng đen đứng dưới gốc đa"></textarea></label>
+      <div class="hr"><label>Phong cách<select id="i-style"></select></label><label>Chất lượng<select id="i-kind"><option value="quality">Đẹp (SDXL)</option><option value="fast">Nhanh (Turbo)</option><option value="flux">Đẹp nhất (FLUX)</option></select></label></div>
+      <label>Khung<select id="i-size"><option>Vuông 1:1</option><option>Dọc 9:16</option><option>Ngang 16:9</option><option>Ngang 4:3</option></select></label>
+      <button class="p" id="i-go">Tạo ảnh</button><div class="note" id="i-note">Cần AI Studio đang chạy (đặt địa chỉ ở tab Cài đặt).</div>
+    </div>
+    <div id="i-res" class="res" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div></section>
+  <!-- VIDEO -->
+  <section class="page" id="p-vid"><div class="scroll">
+    <div class="card"><h2>🎬 Dựng video</h2>
+      <label>Mô tả chuyển động (tiếng Việt)<textarea id="v-desc" rows="3" placeholder="Bóng đen chậm rãi bước ra cuối hành lang, đèn chập chờn, máy quay tiến chậm"></textarea></label>
+      <div class="hr"><label>Phong cách<select id="v-style"></select></label><label>Mô hình<select id="v-kind"><option value="wan">Wan 2.1 (480p)</option><option value="ltx">LTX-Video (nhanh)</option></select></label></div>
+      <label>Độ dài<select id="v-sec"><option value="2">2 giây</option><option value="3" selected>3 giây</option><option value="4">4 giây</option><option value="5">5 giây</option></select></label>
+      <div id="v-start" class="note">Ảnh đầu: chưa có (bấm “→ Làm video” dưới một ảnh đã tạo để video giữ đúng nhân vật/phong cách).</div>
+      <button class="p" id="v-go">Dựng video</button><div class="note">Mỗi clip mất khoảng 3–10 phút trên Colab T4. Có thể chuyển tab trong lúc chờ, nhưng đừng tắt app.</div>
+    </div>
+    <div id="v-res" class="res" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div></section>
+  <!-- CÀI ĐẶT -->
+  <section class="page" id="p-set"><div class="scroll">
+    <div class="card"><h2>☁️ AI Studio (máy chủ)</h2>
+      <label>Địa chỉ Studio (link …gradio.live từ Colab, hoặc http://IP-máy-tính:7860)<input id="s-url" inputmode="url" placeholder="https://xxxx.gradio.live"></label>
+      <div class="hr"><button class="s" id="s-test">Kiểm tra kết nối</button><span id="s-res" class="note"></span></div>
+      <div class="note">Link gradio.live đổi mỗi lần chạy lại Colab, nhớ dán link mới.</div>
+    </div>
+    <div class="card"><h2>🧠 MiniGPT của bạn</h2>
+      <div class="note">GPT bạn tự huấn luyện (thư mục <b>mini-gpt</b>), chạy hoàn toàn trên điện thoại bằng JavaScript, không cần mạng.
+        Huấn luyện trên Colab → ô “Xuất cho điện thoại” → chép file <b>.mgpt</b> vào máy → bấm “Nạp file”.</div>
+      <div id="g-list"></div>
+      <div id="g-dl" style="display:none"><div class="mrow"><span id="g-dlname"></span><button class="s" id="g-dlstop">Dừng</button></div><div class="bar"><i id="g-dlbar"></i></div><div class="note" id="g-dltxt"></div></div>
+      <div class="hr"><button class="s" id="g-import">📂 Nạp file .mgpt</button><button class="s" id="g-usemini">⚡ Dùng lại Mây mini</button></div>
+      <label>Hoặc tải từ link trực tiếp (vd file đính kèm trên GitHub)<input id="g-url" inputmode="url" placeholder="https://…/may.mgpt"></label>
+      <button class="s" id="g-urlgo">Tải về</button>
+      <div class="note" id="g-status"></div>
+    </div>
+    <div class="card"><h2>📱 Mô hình chat trên máy (Qwen, MediaPipe)</h2>
+      <div id="s-ram" class="note"></div>
+      <div id="s-models"></div>
+      <div id="s-dl" style="display:none"><div class="mrow"><span id="s-dlname"></span><button class="s" id="s-dlstop">Dừng</button></div><div class="bar"><i id="s-dlbar"></i></div><div class="note" id="s-dltxt"></div></div>
+      <h2 style="margin-top:6px">Tải mô hình</h2>
+      <div id="s-suggest"></div>
+      <label>Hoặc nhập kho Hugging Face (chứa file .task)<input id="s-repo" placeholder="litert-community/…"></label>
+      <div class="hr"><button class="s" id="s-repolist">Xem file</button><button class="s" id="s-import">Chọn file .task trong máy</button></div>
+      <div id="s-files"></div>
+      <label>Token Hugging Face (chỉ cần cho mô hình yêu cầu đăng nhập, như Gemma)<input id="s-token" placeholder="hf_…" autocomplete="off"></label>
+    </div>
+    <div class="card"><h2>⚙️ Nâng cao</h2>
+      <div class="hr"><label>Độ dài ngữ cảnh (token)<select id="s-max"><option>1024</option><option selected>1280</option><option>2048</option><option>4096</option></select></label>
+      <label>Độ sáng tạo<select id="s-temp"><option value="0.3">Thấp</option><option value="0.7" selected>Vừa</option><option value="1.0">Cao</option></select></label></div>
+      <label>Định dạng hội thoại<select id="s-fmt"><option value="auto">Tự nhận theo tên mô hình</option><option value="chatml">ChatML (Qwen)</option><option value="gemma">Gemma</option><option value="deepseek">DeepSeek-R1</option><option value="raw">Không định dạng</option></select></label>
+      <div class="note">Mô hình trả lời lạ/lặp: thử đổi “Định dạng hội thoại”. Mô hình phải khớp “Độ dài ngữ cảnh” (tên file có “ekv1280” → chọn 1280).</div>
+    </div>
+  </div></section>
+</main>
+<nav><button class="on" data-p="chat"><b>💬</b>Trò chuyện</button><button data-p="img"><b>🎨</b>Ảnh</button><button data-p="vid"><b>🎬</b>Video</button><button data-p="set"><b>⚙️</b>Cài đặt</button></nav>
+
+<script src="may-mini.js"></script>
+<script src="minigpt.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const N = window.Native || null;   // null khi mở trong trình duyệt để thử giao diện
+const store = { get: (k, d) => { try { const v = localStorage.getItem('may:' + k); return v === null ? d : v; } catch { return d; } },
+                set: (k, v) => { try { localStorage.setItem('may:' + k, v); } catch {} } };
+const STYLES = ['Không', 'Kinh dị (Muro Var)', 'Game low-poly', 'Anime', 'Ảnh thật', 'Concept art', 'Pixel art'];
+const SUGGEST = [
+  { repo: 'litert-community/Qwen2.5-1.5B-Instruct', label: 'Qwen2.5 1.5B: tiếng Việt khá, khuyên dùng' },
+  { repo: 'litert-community/DeepSeek-R1-Distill-Qwen-1.5B', label: 'DeepSeek-R1 1.5B: suy nghĩ từng bước (tiếng Việt yếu hơn)' },
+  { repo: 'litert-community/Gemma3-1B-IT', label: 'Gemma 3 1B: nhẹ, nhanh (cần token HF)' },
+];
+const SYS = 'Bạn là Mây, trợ lý AI tiếng Việt thân thiện, xưng "mình", gọi người dùng là "bạn". Trả lời ngắn gọn, chính xác, bằng tiếng Việt. Không chắc thì nói không chắc.';
+const gb = (b) => (b / 1e9).toFixed(b > 1e10 ? 0 : 1) + ' GB';
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// ---------- điều hướng ----------
+let page = 'chat';
+function go(p) { page = p; document.querySelectorAll('.page').forEach((e) => e.classList.toggle('on', e.id === 'p-' + p)); document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.p === p)); if (p === 'set') renderModels(); }
+document.querySelectorAll('nav button').forEach((b) => b.onclick = () => go(b.dataset.p));
+window.onBack = () => { if (page !== 'chat') { go('chat'); return true; } return false; };
+for (const id of ['i-style', 'v-style']) $(id).innerHTML = STYLES.map((s) => `<option>${esc(s)}</option>`).join('');
+
+// ---------- cài đặt ----------
+const bind = (id, key, def) => { $(id).value = store.get(key, def); $(id).onchange = () => store.set(key, $(id).value.trim()); };
+bind('s-url', 'url', ''); bind('s-token', 'token', ''); bind('s-max', 'max', '1280'); bind('s-temp', 'temp', '0.7'); bind('s-fmt', 'fmt', 'auto'); bind('s-repo', 'repo', '');
+const serverUrl = () => store.get('url', '').trim().replace(/\/+$/, '');
+
+// ---------- gọi Studio ----------
+const pending = {}; let seq = 0;
+function studio(api, data) {
+  return new Promise((ok, fail) => {
+    const base = serverUrl();
+    if (!base) return fail(new Error('Chưa đặt địa chỉ AI Studio (tab Cài đặt).'));
+    if (!N) return fail(new Error('Chỉ chạy trong app Android.'));
+    const id = 'r' + (++seq); pending[id] = { ok, fail };
+    if (api === '__ping') N.ping(id, base); else N.studio(id, base, api, JSON.stringify(data));
+  });
+}
+const clean = (m) => String(m).replace(/^⚠️\s*/, '');
+window.onStudio = (id, status, payload) => {
+  const p = pending[id]; if (!p) return; delete pending[id];
+  if (status !== 'ok') { let m = payload; try { m = JSON.parse(payload); } catch {} return p.fail(new Error(clean(m))); }
+  try { p.ok(JSON.parse(payload)); } catch { p.fail(new Error('Phản hồi lạ từ máy chủ')); }
+};
+const fileUrl = (fd) => fd && (fd.path ? `${serverUrl()}/gradio_api/file=${fd.path}` : fd.url);
+$('s-test').onclick = async () => { $('s-res').textContent = 'Đang kiểm tra…'; try { await studio('__ping'); $('s-res').innerHTML = '<span class="ok">✓ Kết nối được AI Studio</span>'; } catch (e) { $('s-res').innerHTML = `<span class="bad">${esc(e.message)}</span>`; } };
+
+// ---------- mô hình trên máy ----------
+let info = { models: [], loaded: null };
+const refreshInfo = () => { if (N) try { info = JSON.parse(N.info()); } catch {} updateStatus(); };
+function updateStatus() {
+  const b = store.get('brain', '');
+  if (b === 'minigpt' && MG.ready) $('status').textContent = `🧠 MiniGPT ${MG.label} · chạy trên máy`;
+  else if (b === 'minigpt' && MG.loading) $('status').textContent = 'Đang nạp MiniGPT…';
+  else if (b !== 'mini' && b !== 'minigpt' && info.loaded) $('status').textContent = `📱 ${info.loaded.replace(/\.task$/, '')} · ${info.backend}`;
+  else $('status').textContent = mini ? 'Mây mini (offline) · nạp MiniGPT hoặc Qwen ở Cài đặt để thông minh hơn' : 'chưa có mô hình';
+}
+function renderModels() {
+  refreshInfo();
+  renderMini();
+  $('s-ram').textContent = info.ramGB ? `RAM máy: ${info.ramGB.toFixed(1)} GB · bộ nhớ trống: ${gb(info.freeBytes || 0)}` : 'Mở trong app Android để quản lý mô hình.';
+  $('s-models').innerHTML = (info.models || []).length ? '' : '<div class="note">Chưa có mô hình nào. Tải một mô hình bên dưới (khoảng 1–2 GB, nên dùng Wi-Fi).</div>';
+  for (const m of info.models || []) {
+    const d = document.createElement('div'); d.className = 'mrow';
+    const on = m.name === info.loaded;
+    d.innerHTML = `<span>${on ? '✅ ' : ''}${esc(m.name)} <span class="note">${gb(m.size)}</span></span>`;
+    const b1 = document.createElement('button'); b1.className = 's'; b1.textContent = on ? 'Đang dùng' : 'Dùng'; b1.disabled = on; b1.onclick = () => loadModel(m.name);
+    const b2 = document.createElement('button'); b2.className = 's'; b2.textContent = 'Xóa';
+    b2.onclick = () => { if (b2.dataset.c) { N.deleteModel(m.name); if (store.get('model') === m.name) store.set('model', ''); renderModels(); } else { b2.dataset.c = 1; b2.textContent = 'Chắc chưa?'; } };
+    d.append(b1, b2); $('s-models').append(d);
+  }
+  $('s-suggest').innerHTML = '';
+  for (const s of SUGGEST) {
+    const d = document.createElement('div'); d.className = 'mrow';
+    d.innerHTML = `<span>${esc(s.label)}</span>`;
+    const b = document.createElement('button'); b.className = 's'; b.textContent = 'Xem'; b.onclick = () => { $('s-repo').value = s.repo; store.set('repo', s.repo); listFiles(s.repo); };
+    d.append(b); $('s-suggest').append(d);
+  }
+}
+const hfWait = {};
+window.onHfList = (id, files, err) => { hfWait[id]?.(files, err); delete hfWait[id]; };
+function listFiles(repo) {
+  if (!N) return;
+  $('s-files').innerHTML = '<div class="note">Đang xem kho mô hình…</div>';
+  const id = 'h' + (++seq);
+  hfWait[id] = (files, err) => {
+    if (err || !files.length) { $('s-files').innerHTML = `<div class="note bad">${esc(err || 'Kho này không có file .task (MediaPipe).')}</div>`; return; }
+    $('s-files').innerHTML = '';
+    for (const f of files) {
+      const d = document.createElement('div'); d.className = 'mrow';
+      d.innerHTML = `<span>${esc(f.file)} <span class="note">${f.size ? gb(f.size) : ''}</span></span>`;
+      const b = document.createElement('button'); b.className = 's'; b.textContent = 'Tải';
+      b.onclick = () => { $('s-dl').style.display = ''; $('s-dlname').textContent = f.file; $('s-dltxt').textContent = 'Bắt đầu…'; N.download(repo, f.file, store.get('token', '')); };
+      d.append(b); $('s-files').append(d);
+    }
+  };
+  N.hfList(id, repo, store.get('token', ''));
+}
+$('s-repolist').onclick = () => { const r = $('s-repo').value.trim(); if (r) { store.set('repo', r); listFiles(r); } };
+$('s-import').onclick = () => { if (N) { $('s-dl').style.display = ''; $('s-dlname').textContent = 'Nhập file…'; N.importModel(); } };
+$('s-dlstop').onclick = () => N && N.cancelDownload();
+window.onDl = (d) => {
+  if (d.kind === 'mgpt') return onMiniDl(d);
+  if (d.error) { $('s-dltxt').innerHTML = `<span class="bad">${esc(d.error)}</span>`; return; }
+  if (d.finished) {
+    $('s-dltxt').innerHTML = '<span class="ok">✓ Xong!</span>'; $('s-dlbar').style.width = '100%';
+    renderModels(); if (!info.loaded) loadModel(d.name); return;
+  }
+  $('s-dlbar').style.width = (d.pct >= 0 ? d.pct : 0) + '%';
+  $('s-dltxt').textContent = `${d.pct >= 0 ? d.pct + '% · ' : ''}${gb(d.done)}${d.total ? ' / ' + gb(d.total) : ''}`;
+};
+function loadModel(name) {
+  if (!N) return;
+  $('status').textContent = `Đang nạp ${name}… (10–40 giây)`;
+  N.load(name, parseInt(store.get('max', '1280')));
+}
+window.onModel = (r) => {
+  refreshInfo();
+  if (r.ok) { store.set('model', r.name); store.set('brain', 'task'); sysMsg(`Đã nạp mô hình ${r.name} (${r.backend}). Mây giờ chạy bằng AI thật trên máy bạn.`); }
+  else sysMsg('Không nạp được mô hình: ' + r.error + '\nThử chọn đúng “Độ dài ngữ cảnh” trong Cài đặt → Nâng cao, hoặc mô hình khác.');
+  if (page === 'set') renderModels();
+};
+
+// ---------- MiniGPT: GPT tự huấn luyện, chạy bằng JavaScript (mobile/minigpt.js) ----------
+const MG = { worker: null, ready: false, loading: false, name: null, label: '', info: null, wait: null, onMsg: null, generating: false, inline: false };
+function mgInline() {                       // dự phòng khi WebView không cho tạo Web Worker: chạy ngay trên trang
+  const w = { onmessage: null, terminate() {} };
+  const inner = { postMessage: (d) => w.onmessage && w.onmessage({ data: d }) };
+  miniGPTWorker(inner);
+  w.postMessage = (d) => setTimeout(() => inner.onmessage({ data: d }), 0);
+  return w;
+}
+function mgSpawn(inline) {
+  if (MG.worker) MG.worker.terminate();
+  let w = null;
+  if (!inline) {
+    try {
+      const src = MiniGPTLib.toString() + '\n(' + miniGPTWorker.toString() + ')(self);';
+      w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    } catch (e) { w = null; }
+  }
+  MG.inline = !w;
+  w = w || mgInline();
+  w.onmessage = (e) => {
+    const d = e.data;
+    if (d.type === 'loaded') MG.wait && MG.wait.ok(d.info);
+    else if (d.type === 'error' && !d.id) MG.wait && MG.wait.fail(new Error(d.error));
+    else MG.onMsg && MG.onMsg(d);
+  };
+  w.onerror = (ev) => { ev.preventDefault && ev.preventDefault(); MG.wait && MG.wait.fail(new Error('worker')); };
+  MG.worker = w;
+}
+const mgUrl = (name) => name === 'demo' ? 'https://minigpt.local/demo.mgpt' : 'https://minigpt.local/files/' + encodeURIComponent(name);
+async function mgFetch(name) {
+  const r = await fetch(mgUrl(name));
+  if (!r.ok) throw new Error('Không đọc được file mô hình (' + r.status + ')');
+  return r.arrayBuffer();
+}
+function mgLoadInto(buf) {
+  return new Promise((ok, fail) => { MG.wait = { ok, fail }; MG.worker.postMessage({ type: 'load', buf }, MG.inline ? undefined : [buf]); });
+}
+async function mgLoad(name) {
+  MG.ready = false; MG.loading = true; MG.name = name;
+  MG.label = name === 'demo' ? 'thử' : name.replace(/\.mgpt$/, '');
+  updateStatus();
+  $('g-status').textContent = 'Đang nạp…';
+  const t0 = Date.now();
+  try {
+    mgSpawn(false);
+    try { MG.info = await mgLoadInto(await mgFetch(name)); }
+    catch (e) {                               // Web Worker hỏng → chạy trên trang
+      if (MG.inline) throw e;
+      mgSpawn(true);
+      MG.info = await mgLoadInto(await mgFetch(name));
+    }
+    MG.ready = true;
+    store.set('brain', 'minigpt'); store.set('mgpt', name);
+    const i = MG.info;
+    $('g-status').innerHTML = `<span class="ok">✓ Đang dùng ${esc(MG.label)}</span> · ${(i.params / 1e6).toFixed(1)}M tham số · ${i.n_layer} lớp · ngữ cảnh ${i.block_size} · ${i.quant} · ${i.kind === 'chat' ? 'bản trò chuyện' : 'bản viết tiếp'} · nạp ${((Date.now() - t0) / 1000).toFixed(1)}s${MG.inline ? ' (chạy trên trang)' : ''}`;
+    sysMsg(`Đã nạp MiniGPT ${MG.label} (${(i.params / 1e6).toFixed(1)}M tham số). Từ giờ mình trả lời bằng GPT bạn tự huấn luyện, chạy ngay trên điện thoại.` + (i.kind === 'chat' ? '' : ' Đây là bản chưa dạy trò chuyện nên mình sẽ viết tiếp câu bạn gõ.'));
+  } catch (e) {
+    MG.ready = false;
+    $('g-status').innerHTML = `<span class="bad">Không nạp được: ${esc(e.message)}</span>`;
+  }
+  MG.loading = false;
+  updateStatus(); renderMini();
+}
+function renderMini() {
+  const list = $('g-list'); list.innerHTML = '';
+  let files = [];
+  if (N && N.miniList) try { files = JSON.parse(N.miniList()); } catch {}
+  const items = [{ name: 'demo', label: 'MiniGPT thử (có sẵn, 1,1M tham số, học từ dữ liệu Mây)', size: 0, builtin: true }]
+    .concat(files.map((f) => ({ name: f.name, label: f.name, size: f.size })));
+  const cur = store.get('brain') === 'minigpt' && MG.ready ? MG.name : null;
+  for (const it of items) {
+    const d = document.createElement('div'); d.className = 'mrow';
+    d.innerHTML = `<span>${it.name === cur ? '✅ ' : ''}${esc(it.label)} ${it.size ? `<span class="note">${gb(it.size)}</span>` : ''}</span>`;
+    const b = document.createElement('button'); b.className = 's'; b.textContent = it.name === cur ? 'Đang dùng' : 'Dùng'; b.disabled = it.name === cur || MG.loading;
+    b.onclick = () => mgLoad(it.name);
+    d.append(b);
+    if (!it.builtin) {
+      const x = document.createElement('button'); x.className = 's'; x.textContent = 'Xóa';
+      x.onclick = () => { if (x.dataset.c) { N.deleteMini(it.name); if (store.get('mgpt') === it.name) store.set('mgpt', ''); renderMini(); } else { x.dataset.c = 1; x.textContent = 'Chắc chưa?'; } };
+      d.append(x);
+    }
+    list.append(d);
+  }
+}
+$('g-import').onclick = () => { if (N && N.importMini) { $('g-dl').style.display = ''; $('g-dlname').textContent = 'Nhập file…'; $('g-dltxt').textContent = ''; N.importMini(); } };
+$('g-urlgo').onclick = () => {
+  const u = $('g-url').value.trim();
+  if (!/^https?:\/\//.test(u)) { $('g-status').textContent = 'Hãy dán link bắt đầu bằng https://'; return; }
+  if (N && N.downloadMini) { $('g-dl').style.display = ''; $('g-dlname').textContent = u.split('/').pop(); $('g-dltxt').textContent = 'Bắt đầu…'; N.downloadMini(u); }
+};
+$('g-dlstop').onclick = () => N && N.cancelDownload();
+$('g-usemini').onclick = () => { store.set('brain', 'mini'); updateStatus(); renderMini(); sysMsg('Đã chuyển về Mây mini.'); };
+function onMiniDl(d) {
+  if (d.error) { $('g-dltxt').innerHTML = `<span class="bad">${esc(d.error)}</span>`; return; }
+  if (d.finished) { $('g-dltxt').innerHTML = '<span class="ok">✓ Xong!</span>'; $('g-dlbar').style.width = '100%'; renderMini(); mgLoad(d.name); return; }
+  $('g-dlbar').style.width = (d.pct >= 0 ? d.pct : 0) + '%';
+  $('g-dltxt').textContent = `${d.pct >= 0 ? d.pct + '% · ' : ''}${gb(d.done)}${d.total ? ' / ' + gb(d.total) : ''}`;
+}
+function mgReply(row, m) {
+  return new Promise((resolve) => {
+    const id = 'g' + (++seq);
+    const chat = MG.info.kind === 'chat';
+    MG.generating = true; $('send').textContent = '■'; $('send').disabled = false;
+    MG.onMsg = (d) => {
+      if (d.id !== id) return;
+      if (d.type === 'token') { m.textContent = d.text.trim() || '…'; $('log').scrollTop = $('log').scrollHeight; return; }
+      MG.generating = false; $('send').textContent = 'Gửi';
+      if (d.type === 'done') {
+        const t = d.text.trim();
+        if (!t) m.textContent = '(MiniGPT không trả lời được câu này)';
+        meta(row, `🧠 MiniGPT ${MG.label} · ${d.stats.tokens} token · ${d.stats.tps.toFixed(1)} token/s · chờ ${(d.stats.firstMs / 1000).toFixed(1)}s${d.stats.stopped ? ' · đã dừng' : ''}`);
+        resolve(t || null);
+      } else { m.textContent = '⚠️ ' + d.error; resolve(null); }
+    };
+    const opts = { temperature: parseFloat(store.get('temp', '0.7')), top_k: 40, top_p: 0.9, repetition_penalty: 1.15, max_new_tokens: chat ? 200 : 120 };
+    if (chat) MG.worker.postMessage({ type: 'chat', id, messages: turns.slice(-12), opts });
+    else MG.worker.postMessage({ type: 'complete', id, text: turns[turns.length - 1].content, opts });
+  });
+}
+
+// ---------- Mây mini (luôn có, không cần tải) ----------
+let mini = null;
+try { mini = createChatbot({ intents: INTENTS, knowledge: KNOWLEDGE, botName: 'Mây' }); mini.train({ epochs: 12 }); } catch (e) { console.warn(e); }
+
+// ---------- chat ----------
+let mode = store.get('mode', 'local');
+const setMode = (m) => { mode = m; store.set('mode', m); $('m-local').classList.toggle('on', m === 'local'); $('m-server').classList.toggle('on', m === 'server'); };
+$('m-local').onclick = () => setMode('local'); $('m-server').onclick = () => setMode('server'); setMode(mode);
+const turns = []; let busy = false;
+function bubble(who, text) {
+  const row = document.createElement('div'); row.className = 'row ' + who;
+  const m = document.createElement('div'); m.className = 'msg'; m.textContent = text; row.append(m);
+  $('log').append(row); $('log').scrollTop = $('log').scrollHeight; return { row, m };
+}
+function sysMsg(t) { bubble('bot', t); }
+function meta(row, t) { const d = document.createElement('div'); d.className = 'meta'; d.textContent = t; row.append(d); }
+const nv = (s) => s.toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[̀-ͯ]/g, '');
+function mediaIntent(t) {
+  const n = nv(t).trim();
+  if (/\b(o dau|the nao|lam sao|tai sao|cach|hoc|co nen|la gi)\b|\?\s*$/.test(n)) return null;
+  if (/^\W*(minh|toi|em|to|tui)\b/.test(n) && !/\b(giup|hay|nho|thu|cho (minh|toi|em))\b/.test(n)) return null;
+  if (/\b(tao|lam|dung|quay|xuat)\s+(?:(?:giup|cho|minh|toi|em|ho|mot|1|cai|doan|thu|nhanh)\s+){0,4}(video|clip)\b/.test(n.slice(0, 80))) return 'video';
+  if (/^(?:\W*(?:hay|ban|may|oi|giup|minh|toi|nho|cho|xin)\b\s*)*(?:(?:ve|tao|lam|thiet ke)\b.{0,30}\b(anh|hinh|tranh|poster|logo|nhan vat|bia|wallpaper)\b|ve\s+\S)/.test(n.slice(0, 80))) return 'image';
+  return null;
+}
+function family(name) {
+  const f = store.get('fmt', 'auto'); if (f !== 'auto') return f;
+  return /gemma/i.test(name) ? 'gemma' : /deepseek/i.test(name) ? 'deepseek' : 'chatml';
+}
+function buildPrompt(fam, hist) {
+  const budget = parseInt(store.get('max', '1280')) * 2;   // ~ký tự dành cho ngữ cảnh
+  let h = hist.slice(-10);
+  while (h.length > 1 && h.reduce((s, t) => s + t.content.length, 0) > budget) h = h.slice(1);
+  if (h[0]?.role === 'assistant') h = h.slice(1);
+  if (fam === 'gemma') return h.map((t, i) => `<start_of_turn>${t.role === 'user' ? 'user' : 'model'}\n${i === 0 ? SYS + '\n\n' : ''}${t.content}<end_of_turn>\n`).join('') + '<start_of_turn>model\n';
+  if (fam === 'deepseek') return h.map((t) => t.role === 'user' ? `<｜User｜>${t.content}` : `<｜Assistant｜>${t.content}<｜end▁of▁sentence｜>`).join('') + '<｜Assistant｜><think>\n';
+  if (fam === 'raw') return h.map((t) => `${t.role === 'user' ? 'Người dùng' : 'Mây'}: ${t.content}`).join('\n') + '\nMây:';
+  return `<|im_start|>system\n${SYS}<|im_end|>\n` + h.map((t) => `<|im_start|>${t.role}\n${t.content}<|im_end|>\n`).join('') + '<|im_start|>assistant\n';
+}
+function splitThink(raw, fam) {
+  let s = raw.replace(/<\|[^|>]*\|>|<\/?(start|end)_of_turn>|<｜[^｜]*｜>/g, '');
+  const inThink = fam === 'deepseek' || s.trimStart().startsWith('<think>');
+  if (s.includes('</think>')) { const [a, b] = s.split('</think>'); return [a.replace('<think>', '').trim(), b.trim()]; }
+  return inThink ? [s.replace('<think>', '').trim(), ''] : ['', s.trim()];
+}
+let onTokCb = null;
+window.onTok = (text, done, err) => onTokCb && onTokCb(text, done, err);
+function localLLM(row, m) {
+  return new Promise((resolve) => {
+    const fam = family(info.loaded || '');
+    const t0 = Date.now();
+    let th = null;
+    onTokCb = (text, done, err) => {
+      if (err) { m.textContent = '⚠️ ' + err; onTokCb = null; return resolve(null); }
+      const [thought, ans] = splitThink(text, fam);
+      if (thought) {
+        if (!th) { th = document.createElement('details'); th.className = 'th'; th.innerHTML = '<summary>🧠 Suy nghĩ…</summary><div></div>'; row.insertBefore(th, m); }
+        th.querySelector('div').textContent = thought;
+        if (ans) th.querySelector('summary').textContent = '🧠 Suy nghĩ (bấm để xem)';
+      }
+      m.textContent = ans || (thought ? '…' : '…');
+      $('log').scrollTop = $('log').scrollHeight;
+      if (done) { onTokCb = null; meta(row, `📱 ${info.loaded} · ${((Date.now() - t0) / 1000).toFixed(1)}s`); resolve(ans); }
+    };
+    N.generate(buildPrompt(fam, turns), parseFloat(store.get('temp', '0.7')), 40);
+  });
+}
+async function makeMedia(kind, text, row, m) {
+  if (kind === 'image') {
+    m.textContent = '🎨 Đang vẽ trên máy chủ… (30–60 giây)';
+    const [gal, md] = await studio('tao_anh', [text, true, 'Không', 'quality', 'Vuông 1:1', 1, -1, '', 0.8, '']);
+    if (!gal?.length) throw new Error(clean(md || 'Không tạo được ảnh'));
+    m.textContent = 'Xong!'; showImage(row, gal[0].image, md);
+  } else {
+    m.textContent = '🎬 Đang dựng video trên máy chủ… (3–10 phút, đừng tắt app)';
+    const [vid, md] = await studio('dung_video', [text, true, 'Không', 'wan', 3, null, -1]);
+    const fd = vid?.video || vid; if (!fd) throw new Error(clean(md || 'Không dựng được video'));
+    m.textContent = 'Xong!'; showVideo(row, fd);
+  }
+}
+async function send() {
+  if (busy) { if (MG.generating && MG.worker) MG.worker.postMessage({ type: 'stop' }); return; }
+  const text = $('q').value.trim(); if (!text) return;
+  $('q').value = ''; autoGrow(); busy = true; $('send').disabled = true;
+  bubble('me', text); turns.push({ role: 'user', content: text });
+  const { row, m } = bubble('bot', '…');
+  try {
+    const media = mediaIntent(text);
+    let ans = null;
+    if (media) {
+      if (!serverUrl()) ans = 'Để vẽ ảnh hoặc làm video, mình cần AI Studio đang chạy (Colab hoặc PC). Hãy dán địa chỉ Studio vào tab Cài đặt nhé.';
+      else { await makeMedia(media, text, row, m); turns.pop(); }
+      if (ans) m.textContent = ans;
+    } else if (mode === 'server') {
+      m.textContent = '☁️ Đang hỏi máy chủ…';
+      const [out] = await studio('chat_api', [text, JSON.stringify(turns.slice(0, -1).slice(-20)), false]);
+      ans = out; m.textContent = out; meta(row, '☁️ Máy chủ');
+    } else if (store.get('brain') === 'minigpt' && (MG.ready || MG.loading)) {
+      if (!MG.ready) throw new Error('MiniGPT đang nạp, đợi vài giây rồi gửi lại.');
+      ans = await mgReply(row, m);
+    } else if (store.get('brain') !== 'mini' && info.loaded && N) {
+      ans = await localLLM(row, m);
+    } else if (mini) {
+      const r = mini.reply(text); ans = r.text; m.textContent = ans; meta(row, '⚡ Mây mini');
+    } else ans = m.textContent = 'Chưa có mô hình. Vào Cài đặt để tải.';
+    if (ans) turns.push({ role: 'assistant', content: ans });
+  } catch (e) { m.textContent = '⚠️ ' + e.message; turns.pop(); }
+  busy = false; $('send').disabled = false; $('send').textContent = 'Gửi';
+}
+$('send').onclick = send;
+$('q').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+const autoGrow = () => { const q = $('q'); q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, 120) + 'px'; };
+$('q').addEventListener('input', autoGrow);
+
+// ---------- ảnh & video ----------
+let startImage = null;
+function showImage(container, fd, md) {
+  const box = document.createElement('div'); box.className = 'card';
+  const img = document.createElement('img'); img.src = fileUrl(fd); box.append(img);
+  const r = document.createElement('div'); r.className = 'hr';
+  const save = document.createElement('button'); save.className = 's'; save.textContent = '💾 Lưu vào máy'; save.onclick = () => N && N.save(fileUrl(fd), false);
+  const anim = document.createElement('button'); anim.className = 's'; anim.textContent = '→ Làm video';
+  anim.onclick = () => { startImage = fd; $('v-start').innerHTML = ''; const t = document.createElement('img'); t.src = fileUrl(fd); t.style.cssText = 'width:96px;border-radius:8px'; const x = document.createElement('button'); x.className = 's'; x.textContent = 'Bỏ ảnh đầu'; x.onclick = () => { startImage = null; $('v-start').textContent = 'Ảnh đầu: chưa có.'; }; $('v-start').append('Ảnh đầu: ', t, ' ', x); go('vid'); };
+  r.append(save, anim); box.append(r);
+  if (md) { const n = document.createElement('div'); n.className = 'note'; n.textContent = md.replace(/\*\*/g, ''); box.append(n); }
+  container.append(box); box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function showVideo(container, fd, md) {
+  const box = document.createElement('div'); box.className = 'card';
+  const v = document.createElement('video'); v.src = fileUrl(fd); v.controls = true; v.loop = true; v.playsInline = true; v.autoplay = true; v.muted = true; box.append(v);
+  const save = document.createElement('button'); save.className = 's'; save.textContent = '💾 Lưu vào máy'; save.onclick = () => N && N.save(fileUrl(fd), true); box.append(save);
+  if (md) { const n = document.createElement('div'); n.className = 'note'; n.textContent = md.replace(/\*\*/g, ''); box.append(n); }
+  container.prepend(box);
+}
+$('i-go').onclick = async () => {
+  const d = $('i-desc').value.trim(); if (!d) return $('i-note').textContent = 'Hãy nhập mô tả.';
+  $('i-go').disabled = true; $('i-note').textContent = 'Đang tạo… (lần đầu máy chủ phải tải mô hình, có thể mất vài phút)';
+  try {
+    const [gal, md] = await studio('tao_anh', [d, true, $('i-style').value, $('i-kind').value, $('i-size').value, 1, -1, '', 0.8, '']);
+    if (!gal?.length) throw new Error(clean(md || 'Không tạo được ảnh'));
+    $('i-note').textContent = 'Xong!'; const holder = document.createElement('div'); $('i-res').prepend(holder); showImage(holder, gal[0].image, md);
+  } catch (e) { $('i-note').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+  $('i-go').disabled = false;
+};
+$('v-go').onclick = async () => {
+  const d = $('v-desc').value.trim(); if (!d) return;
+  $('v-go').disabled = true; $('v-go').textContent = 'Đang dựng… (3–10 phút)';
+  try {
+    const img = startImage ? { path: startImage.path, meta: { _type: 'gradio.FileData' } } : null;
+    const [vid, md] = await studio('dung_video', [d, true, $('v-style').value, $('v-kind').value, parseInt($('v-sec').value), img, -1]);
+    const fd = vid?.video || vid; if (!fd) throw new Error(clean(md || 'Không dựng được video'));
+    showVideo($('v-res'), fd, md);
+  } catch (e) { const n = document.createElement('div'); n.className = 'note bad'; n.textContent = '⚠️ ' + e.message; $('v-res').prepend(n); }
+  $('v-go').disabled = false; $('v-go').textContent = 'Dựng video';
+};
+
+// ---------- khởi động ----------
+refreshInfo();
+const last = store.get('model', '');
+if (N && !info.loaded && last && store.get('brain') !== 'minigpt' && store.get('brain') !== 'mini' && (info.models || []).some((m) => m.name === last)) loadModel(last);
+if (store.get('brain') === 'minigpt' && store.get('mgpt')) mgLoad(store.get('mgpt'));
+sysMsg(!N ? 'Đang mở trong trình duyệt: chỉ có Mây mini để thử giao diện.'
+  : store.get('brain') === 'minigpt' ? 'Chào bạn! Mình là Mây, đang chạy bằng MiniGPT của bạn.'
+  : (info.models?.length || store.get('brain') === 'mini') ? 'Chào bạn! Mình là Mây.'
+  : 'Chào bạn! Mình là Mây (bản mini offline). Vào ⚙️ Cài đặt để chọn bộ não chạy ngay trên máy: 🧠 MiniGPT (GPT bạn tự huấn luyện, có sẵn bản thử) hoặc Qwen 1.5B (~1,6 GB, thông minh hơn).');
+updateStatus();
+</script>
+</body>
+</html>

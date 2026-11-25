@@ -1,0 +1,14 @@
+# Cài: pip install -r requirements.txt   (PyTorch có CUDA cài riêng nếu máy chưa có — Colab đã có sẵn)
+torch>=2.4
+transformers>=4.51
+accelerate>=1.2
+bitsandbytes>=0.45
+peft>=0.14
+diffusers>=0.33
+gradio>=5,<6
+sentencepiece
+protobuf
+ftfy
+imageio[ffmpeg]
+pillow
+pypdf
